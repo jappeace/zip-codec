@@ -1,29 +1,26 @@
 [![https://jappieklooster.nl](https://img.shields.io/badge/blog-jappieklooster.nl-lightgrey)](https://jappieklooster.nl/tag/haskell.html)
-[![Jappiejappie](https://img.shields.io/badge/twitch.tv-jappiejappie-purple?logo=twitch)](https://www.twitch.tv/jappiejappie)
-[![Jappiejappie](https://img.shields.io/badge/youtube-jappieklooster-red?logo=youtube)](https://www.youtube.com/channel/UCQxmXSQEYyCeBC6urMWRPVw)
-[![Githbu actions build status](https://img.shields.io/github/workflow/status/jappeace/haskell-template-project/Test)](https://github.com/jappeace/haskell-template-project/actions)
+[![Githbu actions build status](https://img.shields.io/github/workflow/status/jappeace/zip-codec/Test)](https://github.com/jappeace/zip-codec/actions)
 [![Jappiejappie](https://img.shields.io/badge/discord-jappiejappie-black?logo=discord)](https://discord.gg/Hp4agqy)
-[![Hackage version](https://img.shields.io/hackage/v/template.svg?label=Hackage)](https://hackage.haskell.org/package/template) 
+[![Hackage version](https://img.shields.io/hackage/v/template.svg?label=Hackage)](https://hackage.haskell.org/package/zip-codec) 
 
 > The eye that looks ahead to the safe course is closed forever.
 
-Haskell project template.
+A codec for the zip
+https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
 
-Set up cabal within a nix shell.
-If you like nix this is a good way of doing haskell development.
+heavily inspired by zip-conduit,
+makes monads opt in. 
+Unlike zip which is completly baked around IO.
 
-similar to: https://github.com/monadfix/nix-cabal
-except this has a makefile and ghcid.
-We also make aggressive use of [pinning](https://nixos.wiki/wiki/FAQ/Pinning_Nixpkgs)
-ensuring project builds for ever (theoretically).
+The ambition is to get parralel reading of a single
+input file/bytestring
 
-Comes with:
-+ [GHCID](https://jappieklooster.nl/ghcid-for-multi-package-projects.html)
-+ a nix shell, meaning somewhat platform independence.
-  + which is pinned by default
-+ A couple of handy make commands.
-+ Starting haskell files, assuming we put practically all code in library
-+ Working HSpec, The detection macro will pickup any file ending with Spec.hs
+TODO:
+
++ [ ] get a working implementation
++ [ ] See if can get tests from other libraries
++ [ ] See if can get benchmarks
+
 
 ## Usage
 

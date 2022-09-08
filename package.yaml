@@ -1,10 +1,10 @@
-name:                template
+name:                zip-codec
 version:             1.0.0
 license:             MIT
 author:              "Jappie Klooster"
 maintainer:          "jappieklooster@hotmail.com"
 copyright:           "2020 Jappie Klooster"
-github:              "jappeace/template"
+github:              "jappeace/zip-codec"
 
 extra-source-files:
 - Readme.md
@@ -75,4 +75,4 @@ tests:
     - tasty
     - tasty-quickcheck
     - tasty-hunit
-    - template
+    - zip-codec
