@@ -1,13 +1,13 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.6.
+-- This file has been generated from package.yaml by hpack version 0.34.7.
 --
 -- see: https://github.com/sol/hpack
 
-name:           template
+name:           zip-codec
 version:        1.0.0
-homepage:       https://github.com/jappeace/template#readme
-bug-reports:    https://github.com/jappeace/template/issues
+homepage:       https://github.com/jappeace/zip-codec#readme
+bug-reports:    https://github.com/jappeace/zip-codec/issues
 author:         Jappie Klooster
 maintainer:     jappieklooster@hotmail.com
 copyright:      2020 Jappie Klooster
@@ -21,14 +21,20 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/jappeace/template
+  location: https://github.com/jappeace/zip-codec
 
 library
   exposed-modules:
       Main
       Template
+      Zip.Codec
+      Zip.Codec.CentralDirectory
+      Zip.Codec.End
+      Zip.Codec.FileHeader
+      Zip.Codec.Get
+      Zip.Codec.Time
   other-modules:
-      Paths_template
+      Paths_zip_codec
   hs-source-dirs:
       src
   default-extensions:
@@ -54,13 +60,26 @@ library
   ghc-options: -Wall -Wcompat -Wincomplete-uni-patterns -Wredundant-constraints -Wincomplete-record-updates -Widentities -Wcpp-undef -fwarn-tabs -Wpartial-fields -fdefer-diagnostics -Wunused-packages
   build-depends:
       base >=4.7 && <5
+    , binary
+    , bytestring
+    , conduit
+    , conduit-extra
+    , containers
+    , text
+    , time
   default-language: Haskell2010
 
 executable exe
   main-is: Main.hs
   other-modules:
       Template
-      Paths_template
+      Zip.Codec
+      Zip.Codec.CentralDirectory
+      Zip.Codec.End
+      Zip.Codec.FileHeader
+      Zip.Codec.Get
+      Zip.Codec.Time
+      Paths_zip_codec
   hs-source-dirs:
       src
   default-extensions:
@@ -86,13 +105,20 @@ executable exe
   ghc-options: -Wall -Wcompat -Wincomplete-uni-patterns -Wredundant-constraints -Wincomplete-record-updates -Widentities -Wcpp-undef -fwarn-tabs -Wpartial-fields -fdefer-diagnostics -Wunused-packages -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , binary
+    , bytestring
+    , conduit
+    , conduit-extra
+    , containers
+    , text
+    , time
   default-language: Haskell2010
 
 test-suite unit
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
-      Paths_template
+      Paths_zip_codec
   hs-source-dirs:
       test
   default-extensions:
@@ -118,8 +144,15 @@ test-suite unit
   ghc-options: -Wall -Wcompat -Wincomplete-uni-patterns -Wredundant-constraints -Wincomplete-record-updates -Widentities -Wcpp-undef -fwarn-tabs -Wpartial-fields -fdefer-diagnostics -Wunused-packages
   build-depends:
       base >=4.7 && <5
+    , binary
+    , bytestring
+    , conduit
+    , conduit-extra
+    , containers
     , tasty
     , tasty-hunit
     , tasty-quickcheck
-    , template
+    , text
+    , time
+    , zip-codec
   default-language: Haskell2010
