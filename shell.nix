@@ -5,7 +5,7 @@
 #  https://input-output-hk.github.io/haskell.nix/tutorials/development/
 #  https://github.com/NixOS/nixpkgs/blob/master/pkgs/development/haskell-modules/make-package-set.nix#L345
 pkgs.haskellPackages.shellFor {
-  packages = ps : [ ps.template ];
+  packages = ps : [ ps.zip-codec ];
   buildInputs = [
         pkgs.ghcid
         pkgs.cabal-install

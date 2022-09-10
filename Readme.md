@@ -32,20 +32,20 @@ git clone git@github.com:jappeace/haskell-template-project.git new-project
 cd new-project
 ```
 
-+ [ ] Edit package.yaml,
-    + [ ] find and replace template with `new-project`
++ [x] Edit package.yaml,
+    + [x] find and replace template with `new-project`
     + [ ] Update copyright
     + [ ] Update github
-+ [ ] Run `make hpack` to update cabal files
-+ [ ] remove template.cabal
-+ [ ] Edit Changelog.md
++ [x] Run `make hpack` to update cabal files
++ [x] remove template.cabal
++ [x] Edit Changelog.md
   + [ ] replace template with `new-project`
   + [ ] Also describe your version 1.0.0 release.
-+ [ ] Edit default.nix, replace template with `new-project`.
-+ [ ] Edit copyright in LICENSE
-+ [ ] Edit `nix/bundle.nix` to point to the executable
-+ [ ] Edit `nix/ci.nix` and `nix/pkgs.nix` for name of package
-+ [ ] Edit `shell.nix`
++ [x] Edit default.nix, replace template with `new-project`.
++ [x] Edit copyright in LICENSE
++ [x] Edit `nix/bundle.nix` to point to the executable
++ [x] Edit `nix/ci.nix` and `nix/pkgs.nix` for name of package
++ [x] Edit `shell.nix`
 
 #### Reconfigure remotes
 ```
