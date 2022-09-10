@@ -13,7 +13,7 @@ import Data.Map
 import Data.Serialize.Get
 import qualified Data.ByteString as B
 import           Data.ByteString (ByteString)
-import           System.IO (Handle, SeekMode(..), hFileSize, hSeek, hTell)
+import           System.IO (Handle, SeekMode(..),  hSeek)
 import Zip.Codec.End
 import Control.Applicative(many)
 import Data.Maybe(catMaybes)
@@ -36,6 +36,7 @@ data CentralDirectory = CentralDirectory
 
 data CenteralDirErrors = MkGetErrors String
                        | FileDecodeErrors GetFileHeaderError
+                       deriving Show
 
 readCentralDirectory :: Handle -> End -> IO (Either CenteralDirErrors CentralDirectory)
 readCentralDirectory h e = do
@@ -57,9 +58,9 @@ getCentralDirectory = do
 hGetCentralDirectory :: Handle -> End -> IO ByteString
 hGetCentralDirectory h e = do
     hSeek h AbsoluteSeek $ fromIntegral offset
-    B.hGet h size
+    B.hGet h size'
   where
-    size   = endCentralDirectorySize e
+    size'  = endCentralDirectorySize e
     offset = endCentralDirectoryOffset e
 
 maybeEmpty :: Get a -> Get (Maybe a)

@@ -7,8 +7,9 @@ module Zip.Codec.FileHeader
   )
 where
 
+import Data.Text(Text)
 import Data.Time
-import           System.IO (Handle, SeekMode(..), hFileSize, hSeek, hTell)
+import           System.IO (Handle, SeekMode(..), hSeek)
 import Data.Serialize.Get
 import Zip.Codec.Time
 import           Data.Word (Word16, Word32)
@@ -17,7 +18,6 @@ import qualified Data.ByteString as B
 import Data.Text.Encoding(decodeUtf8')
 import           Control.Monad (unless)
 import Data.Text.Encoding.Error (UnicodeException)
-import Data.Functor((<&>))
 import qualified Data.Text as T
 import Data.Bifunctor
 
@@ -56,15 +56,17 @@ data FileHeader = FileHeader
     , fhRelativeOffset         :: Word32
     , fhFileName               :: FilePath
     , fhExtraField             :: ByteString
-    , fhFileComment            :: ByteString
+    , fhFileComment            :: Text
     } deriving (Show)
 
 
 data CompressionMethod = NoCompression
                        | Deflate
-                         deriving (Show)
+                         deriving (Show, Eq)
 
 data GetFileHeaderError = DecodeFileNameFailed { original :: ByteString, exception :: UnicodeException}
+                        | DecodeCommentFailed { original :: ByteString, exception :: UnicodeException}
+                        deriving Show
 
 getFileHeader :: Get (Either GetFileHeaderError FileHeader)
 getFileHeader = do
@@ -83,7 +85,7 @@ getFileHeader = do
     lastModFileTime        <- getWord16le
     lastModFileDate        <- getWord16le
     crc32                  <- getWord32le
-    compressedSize         <- fromIntegral <$> getWord32le
+    compressedSize         <- getWord32le
     uncompressedSize       <- getWord32le
     fileNameLength         <- fromIntegral <$> getWord16le
     extraFieldLength       <- fromIntegral <$> getWord16le
@@ -91,12 +93,14 @@ getFileHeader = do
     skip 2
     internalFileAttributes <- getWord16le
     externalFileAttributes <- getWord32le
-    relativeOffset         <- fromIntegral <$> getWord32le
+    relativeOffset         <- getWord32le
     fileName               <- getByteString fileNameLength
     extraField             <- getByteString extraFieldLength
     fileComment            <- getByteString fileCommentLength
-    return $ first (DecodeFileNameFailed fileName) $
-             decodeUtf8' fileName <&> \fname -> FileHeader
+    return $ do
+      fname <- first (DecodeFileNameFailed fileName) $ decodeUtf8' fileName
+      comment <- first (DecodeCommentFailed  fileComment) $ decodeUtf8' fileComment
+      pure $ FileHeader
                { fhBitFlag                = bitFlag
                , fhCompressionMethod      = compessionMethod
                , fhLastModified           = toUTC lastModFileDate lastModFileTime
@@ -108,7 +112,7 @@ getFileHeader = do
                , fhRelativeOffset         = relativeOffset
                , fhFileName               = T.unpack fname
                , fhExtraField             = extraField
-               , fhFileComment            = fileComment
+               , fhFileComment            = comment
                }
   where
     toUTC date time =
@@ -138,11 +142,6 @@ getLocalFileHeaderLength = do
     return $ fromIntegral localFileHeaderConstantLength
            + fileNameLength
            + extraFieldLength
-
-localFileHeaderLength :: FileHeader -> Word32
-localFileHeaderLength fh =
-  fromIntegral $ 4 + 2 + 2 + 2 + 2 + 2 + 4 + 4 + 4 + 2 + 2
-               + length (fhFileName fh) + B.length (fhExtraField fh)
 
 localFileHeaderConstantLength :: Int
 localFileHeaderConstantLength = 4 + 2 + 2 + 2 + 2 + 2 + 4 + 4 + 4 + 2 + 2

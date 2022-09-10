@@ -25,8 +25,6 @@ source-repository head
 
 library
   exposed-modules:
-      Main
-      Template
       Zip.Codec
       Zip.Codec.CentralDirectory
       Zip.Codec.End
@@ -80,7 +78,6 @@ library
 executable exe
   main-is: Main.hs
   other-modules:
-      Template
       Zip.Codec
       Zip.Codec.CentralDirectory
       Zip.Codec.End
@@ -169,6 +166,7 @@ test-suite unit
     , directory
     , exceptions
     , filepath
+    , lens
     , mtl
     , old-time
     , primitive
@@ -176,6 +174,7 @@ test-suite unit
     , tasty
     , tasty-hunit
     , tasty-quickcheck
+    , temporary
     , text
     , time
     , transformers

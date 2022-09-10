@@ -3,38 +3,45 @@ module Main where
 import Test.Tasty
 import Test.Tasty.QuickCheck as QC
 import Test.Tasty.HUnit
-
+import qualified Data.Map as Map
+import System.IO.Temp(withSystemTempDirectory)
+import           System.FilePath ((</>), dropDrive, takeDirectory)
+import Control.Exception
+import           Data.List ((\\))
+import Control.Monad.Trans.Resource
 import Data.List(sort)
-import qualified Template
+import Zip.Codec
+import Control.Lens
 
 main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests" [qcProps, unitTests]
+tests =
+    testGroup "Unit tests"
+                [ testCase "file headers same" assertFileHeadersSame
+                -- , testCase "conduit uncompressed" (assertFileHeadersSame sinkEntryUncompressed)
+                -- -- , testCase "conduit parallel" (assertFileHeadersSame sinkEntryUncompressed)
+                -- , testCase "files      " (assertFiles Nothing)
+                -- , testCase "files-as   " (assertFiles $ Just ("contents" </>))
+                ]
 
-qcProps :: TestTree
-qcProps = testGroup "(checked by QuickCheck)"
-  [ QC.testProperty "sort == sort . reverse" $
-      \list -> sort (list :: [Int]) == sort (reverse list)
-  , QC.testProperty "Fermat's little theorem" $
-      \x -> ((x :: Integer)^zeven  - x) `mod` zeven == 0
-  ]
+assertFileHeadersSame :: IO ()
+assertFileHeadersSame =
+    withSystemTempDirectory "zip-conduit" $ \dir -> do
+        let archivePath = dir </> archiveName
+
+        writeZipFile archivePath $ Map.fromList entriesInfo
+        result' <- readZipFile @(ResourceT IO) archivePath
+        case result' of
+          Left errors -> throwIO errors
+          Right result -> do
+            assertEqual "list diff is same" [] ((over (mapped . _2) foFileOptions entriesInfo) \\
+                                                over (mapped . _2) (fromFileHeader . fcFileHeader) (Map.toList result))
   where
-    zeven :: Integer
-    zeven = 7
-
-oneTwoThree :: [Int]
-oneTwoThree = [1, 2, 3]
-
-unitTests :: TestTree
-unitTests = testGroup "Unit tests"
-  [ testCase "List comparison (different length)" $
-       oneTwoThree `compare` [1,2] @?= GT
-
-  -- the following test does not hold
-  , testCase "List comparison (same length)" $
-      oneTwoThree `compare` [1,2,3] @?= EQ
-  , testCase "run main" $ do
-      Template.main
-  ]
+    archiveName = "test.zip"
+    entriesInfo :: [(FilePath, FileWriteOptions (ResourceT IO))]
+    entriesInfo = [ ("test1.txt", appendBytestring "some test text" defOptions)
+                  , ("test2.txt", appendBytestring "some another test text" defOptions)
+                  , ("test3.txt", appendBytestring "one more" defOptions)
+                  ]

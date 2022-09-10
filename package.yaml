@@ -92,3 +92,5 @@ tests:
     - tasty-quickcheck
     - tasty-hunit
     - zip-codec
+    - temporary
+    - lens
