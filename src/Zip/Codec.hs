@@ -9,7 +9,6 @@ module Zip.Codec
   , FileContent(..)
     -- * writing
   , writeZipFile
-  , FileWriteOptions(..)
   , defOptions
   , fromFileHeader
   , appendBytestring
@@ -43,8 +42,8 @@ data CodecErrors = FailedEndReading String
                  deriving (Show, Exception)
 
 data FileContent m = MkFileContent
-  { fcFileHeader :: FileHeader
-  , fcData :: ConduitT () ByteString m ()
+  { fcFileHeader :: FileInZipOptions -- ^ simplified representation of FileHeader
+  , fcFileContents :: ConduitT () ByteString m ()
   }
 
 -- | this opens up a file from the filesystem
@@ -56,8 +55,8 @@ readZipFile zipPath =
       central <- except . first FailedCentralDirectoryReading =<< liftIO (readCentralDirectory handle' end)
       pure $
         (\header -> ( MkFileContent
-                  { fcFileHeader = header
-                  , fcData = sourceFile zipPath header
+                  { fcFileHeader = fromFileHeader header
+                  , fcFileContents = sourceFile zipPath header
                   })) <$> cdFileHeaders central
 
 data FileInZipOptions = MkFileInZipOptions {
@@ -68,28 +67,21 @@ data FileInZipOptions = MkFileInZipOptions {
   , fizComment      :: Text
   } deriving (Show, Eq)
 
-data FileWriteOptions m = MkFileWriteOptions {
-    foFileOptions      ::  FileInZipOptions
-  , foFileContents     :: ConduitT () ByteString m ()
-  }
-
-
-
-defOptions :: Monad m => FileWriteOptions m
-defOptions = MkFileWriteOptions
-    { foFileOptions = MkFileInZipOptions
+defOptions :: Monad m => FileContent m
+defOptions = MkFileContent
+    { fcFileHeader = MkFileInZipOptions
       { fizCompression  = Deflate
       , fizModification = UTCTime { utctDay = toEnum 0, utctDayTime = 0}
       , fizBitflag      = 0
       , fizExtraField   = mempty
       , fizComment      = mempty
       }
-    , foFileContents     = yield mempty
+    , fcFileContents     = yield mempty
     }
 
 -- | appends a bytestring to the content conduit
-appendBytestring :: Monad m => ByteString -> FileWriteOptions m -> FileWriteOptions m
-appendBytestring bs opts = opts{ foFileContents = foFileContents opts <> yield bs }
+appendBytestring :: Monad m => ByteString -> FileContent m -> FileContent m
+appendBytestring bs opts = opts{ fcFileContents = fcFileContents opts <> yield bs }
 
 
 fromFileHeader :: FileHeader -> FileInZipOptions
@@ -104,7 +96,7 @@ fromFileHeader FileHeader{..} =
 
 -- shouldn't this return a map of sinks instead?
 -- I'm not sure how finilzation works then
-writeZipFile :: FilePath -> Map FilePath (FileWriteOptions m) -> IO ()
+writeZipFile :: FilePath -> Map FilePath (FileContent m) -> IO ()
 writeZipFile _fp _files = do
   pure ()
 

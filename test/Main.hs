@@ -1,15 +1,13 @@
 module Main where
 
 import Test.Tasty
-import Test.Tasty.QuickCheck as QC
 import Test.Tasty.HUnit
 import qualified Data.Map as Map
 import System.IO.Temp(withSystemTempDirectory)
-import           System.FilePath ((</>), dropDrive, takeDirectory)
+import           System.FilePath ((</>))
 import Control.Exception
 import           Data.List ((\\))
 import Control.Monad.Trans.Resource
-import Data.List(sort)
 import Zip.Codec
 import Control.Lens
 
@@ -36,11 +34,11 @@ assertFileHeadersSame =
         case result' of
           Left errors -> throwIO errors
           Right result -> do
-            assertEqual "list diff is same" [] ((over (mapped . _2) foFileOptions entriesInfo) \\
-                                                over (mapped . _2) (fromFileHeader . fcFileHeader) (Map.toList result))
+            assertEqual "list diff is same" [] ((over (mapped . _2) fcFileHeader entriesInfo) \\
+                                                (over (mapped . _2) fcFileHeader $ Map.toList result))
   where
     archiveName = "test.zip"
-    entriesInfo :: [(FilePath, FileWriteOptions (ResourceT IO))]
+    entriesInfo :: [(FilePath, FileContent (ResourceT IO))]
     entriesInfo = [ ("test1.txt", appendBytestring "some test text" defOptions)
                   , ("test2.txt", appendBytestring "some another test text" defOptions)
                   , ("test3.txt", appendBytestring "one more" defOptions)
