@@ -6,6 +6,12 @@ module Zip.Codec.Time
   )
 where
 
+import           Data.Time (UTCTime(..), TimeOfDay(..), fromGregorian, picosecondsToDiffTime, secondsToDiffTime, timeToTimeOfDay, toGregorian)
+import           System.Time (ClockTime(..))
+import Data.Word
+import           Data.Bits ((.&.), shiftR, shiftL)
+import           Data.Time.Clock.POSIX (posixSecondsToUTCTime)
+
 data MSDOSDateTime = MSDOSDateTime
     { msDOSDate :: Word16
     , msDOSTime :: Word16

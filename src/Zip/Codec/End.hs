@@ -6,11 +6,9 @@ module Zip.Codec.End
 where
 
 import           Data.ByteString (ByteString)
-import qualified Data.ByteString.Lazy as L
-import qualified Data.ByteString as B (hGet, hPut, length, pack, empty)
-import Data.Binary.Get (Get, getWord32le, getWord16le, getByteString, skip)
+import qualified Data.ByteString as B
+import Data.Serialize.Get
 import           System.IO (Handle, SeekMode(..), hFileSize, hSeek, hTell)
-import Zip.Codec.Get
 
 
 -- | End of central directory record:
@@ -36,7 +34,7 @@ data End = End
     } deriving (Show)
 
 
-readEnd :: Handle -> IO (Either (GetResult String) End)
+readEnd :: Handle -> IO (Either String End)
 readEnd h =
     runGet getEnd <$> hGetEnd h
 
@@ -54,7 +52,7 @@ getEnd = do
 
 
 -- TODO: find a better way to find the end of central dir signature
-hGetEnd :: Handle -> IO L.ByteString
+hGetEnd :: Handle -> IO ByteString
 hGetEnd h = do
     hSeek h SeekFromEnd (-4)
     loop

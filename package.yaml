@@ -60,6 +60,15 @@ dependencies:
 - conduit-extra 
 - binary
 - time
+- cereal
+- directory
+- old-time
+- filepath
+- mtl
+- resourcet
+- transformers
+- primitive
+- exceptions
 
 library:
   source-dirs: src

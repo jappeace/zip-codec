@@ -2,13 +2,24 @@ module Zip.Codec.FileHeader
   ( getFileHeader
   , FileHeader(..)
   , calculateFileDataOffset
+  , CompressionMethod(..)
+  , GetFileHeaderError(..)
   )
 where
 
 import Data.Time
 import           System.IO (Handle, SeekMode(..), hFileSize, hSeek, hTell)
-import Data.Binary.Get
+import Data.Serialize.Get
 import Zip.Codec.Time
+import           Data.Word (Word16, Word32)
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString as B
+import Data.Text.Encoding(decodeUtf8')
+import           Control.Monad (unless)
+import Data.Text.Encoding.Error (UnicodeException)
+import Data.Functor((<&>))
+import qualified Data.Text as T
+import Data.Bifunctor
 
 -- | File header:
 --
@@ -53,8 +64,9 @@ data CompressionMethod = NoCompression
                        | Deflate
                          deriving (Show)
 
+data GetFileHeaderError = DecodeFileNameFailed { original :: ByteString, exception :: UnicodeException}
 
-getFileHeader :: Get FileHeader
+getFileHeader :: Get (Either GetFileHeaderError FileHeader)
 getFileHeader = do
     signature 0x02014b50
     skip 2
@@ -83,7 +95,8 @@ getFileHeader = do
     fileName               <- getByteString fileNameLength
     extraField             <- getByteString extraFieldLength
     fileComment            <- getByteString fileCommentLength
-    return FileHeader
+    return $ first (DecodeFileNameFailed fileName) $
+             decodeUtf8' fileName <&> \fname -> FileHeader
                { fhBitFlag                = bitFlag
                , fhCompressionMethod      = compessionMethod
                , fhLastModified           = toUTC lastModFileDate lastModFileTime
@@ -93,7 +106,7 @@ getFileHeader = do
                , fhInternalFileAttributes = internalFileAttributes
                , fhExternalFileAttributes = externalFileAttributes
                , fhRelativeOffset         = relativeOffset
-               , fhFileName               = toString fileName
+               , fhFileName               = T.unpack fname
                , fhExtraField             = extraField
                , fhFileComment            = fileComment
                }
@@ -103,14 +116,14 @@ getFileHeader = do
                                              , msDOSTime = time
                                              }
 
-calculateFileDataOffset :: Handle -> FileHeader -> IO Integer
+calculateFileDataOffset :: Handle -> FileHeader -> IO (Either String Integer)
 calculateFileDataOffset h fh = do
     lfhLength <- readLocalFileHeaderLength h fh
-    return $ fromIntegral (fhRelativeOffset fh) + lfhLength
+    return $ (fromIntegral (fhRelativeOffset fh) +) <$> lfhLength
 
-readLocalFileHeaderLength :: Handle -> FileHeader -> IO Integer
+readLocalFileHeaderLength :: Handle -> FileHeader -> IO (Either String Integer)
 readLocalFileHeaderLength h header =
-    runGet' getLocalFileHeaderLength <$> hGetLocalFileHeader h header
+    runGet getLocalFileHeaderLength <$> hGetLocalFileHeader h header
 
 
 -- Gets length of the local file header, i.e. sum of lengths of its
@@ -125,3 +138,25 @@ getLocalFileHeaderLength = do
     return $ fromIntegral localFileHeaderConstantLength
            + fileNameLength
            + extraFieldLength
+
+localFileHeaderLength :: FileHeader -> Word32
+localFileHeaderLength fh =
+  fromIntegral $ 4 + 2 + 2 + 2 + 2 + 2 + 4 + 4 + 4 + 2 + 2
+               + length (fhFileName fh) + B.length (fhExtraField fh)
+
+localFileHeaderConstantLength :: Int
+localFileHeaderConstantLength = 4 + 2 + 2 + 2 + 2 + 2 + 4 + 4 + 4 + 2 + 2
+
+signature :: Word32 -> Get ()
+signature sig = do
+    s <- lookAhead getWord32le
+    if s == sig
+      then skip 4
+      else fail "Wrong signature."
+
+hGetLocalFileHeader :: Handle -> FileHeader -> IO ByteString
+hGetLocalFileHeader h fh = do
+    hSeek h AbsoluteSeek offset
+    B.hGet h localFileHeaderConstantLength
+  where
+    offset = fromIntegral $ fhRelativeOffset fh
