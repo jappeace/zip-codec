@@ -58,7 +58,7 @@ readZipFile zipPath =
       end <- except . first FailedEndReading =<< liftIO (readEnd handle')
       liftIO $ putStrLn "reading central dir"
       central <- except . first FailedCentralDirectoryReading =<< liftIO (readCentralDirectory handle' end)
-      liftIO $ putStrLn "returning conduit"
+      liftIO $ print ("returning conduit", central)
       pure $
         (\header -> ( MkFileContent
                   { fcFileHeader = fromFileHeader header

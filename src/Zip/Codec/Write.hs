@@ -58,7 +58,7 @@ sinkFile existingCentralDir end zipPath filePath options =
 
 updateEnd :: DataDescriptor -> FileHeader -> End -> End
 updateEnd dd fh end = end {
-  endCentralDirectoryOffset = endCentralDirectoryOffset end
+    endCentralDirectoryOffset = endCentralDirectoryOffset end
                             + fromIntegral (localFileHeaderLength fh + ddCompressedSize dd)
   , endCentralDirectorySize = endCentralDirectorySize end + fromIntegral (fileHeaderLength fh)
   }

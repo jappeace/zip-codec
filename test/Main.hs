@@ -61,8 +61,8 @@ assertFileHeadersSame = do
             throwIO errors
           Right result -> do
             putStrLn "asserting equal"
-            assertEqual "list diff is same" [] ((over (mapped . _2) fcFileHeader entriesInfo) \\
-                                                (over (mapped . _2) fcFileHeader $ Map.toList result))
+            assertEqual "list diff is same" (over (mapped . _2) fcFileHeader entriesInfo)
+                                            ((over (mapped . _2) fcFileHeader $ Map.toList result))
   where
     archiveName = "test.zip"
     entriesInfo :: [(FilePath, FileContent (ResourceT IO))]
