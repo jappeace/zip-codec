@@ -5,12 +5,15 @@ module Zip.Codec.CentralDirectory
   , readCentralDirectory
   , getCentralDirectory
   , CenteralDirErrors(..)
+  , writeCentralDirectory
+  , putCentralDirectory
   )
 where
 
 import Zip.Codec.FileHeader
 import Data.Map
 import Data.Serialize.Get
+import Data.Serialize.Put
 import qualified Data.ByteString as B
 import           Data.ByteString (ByteString)
 import           System.IO (Handle, SeekMode(..),  hSeek)
@@ -69,3 +72,12 @@ maybeEmpty p = do
     if e
       then return Nothing
       else Just <$> p
+
+writeCentralDirectory :: Handle -> CentralDirectory -> IO ()
+writeCentralDirectory h cd =
+    B.hPut h . runPut $ putCentralDirectory cd
+
+
+putCentralDirectory :: CentralDirectory -> Put
+putCentralDirectory cd =
+    mapM_ putFileHeader $ cdFileHeaders cd

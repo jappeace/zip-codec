@@ -4,6 +4,9 @@ module Zip.Codec.FileHeader
   , calculateFileDataOffset
   , CompressionMethod(..)
   , GetFileHeaderError(..)
+  , writeLocalFileHeader
+  , putLocalFileHeader
+  , putFileHeader
   )
 where
 
@@ -11,11 +14,12 @@ import Data.Text(Text)
 import Data.Time
 import           System.IO (Handle, SeekMode(..), hSeek)
 import Data.Serialize.Get
+import           Data.Serialize
 import Zip.Codec.Time
 import           Data.Word (Word16, Word32)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
-import Data.Text.Encoding(decodeUtf8')
+import Data.Text.Encoding(decodeUtf8', encodeUtf8)
 import           Control.Monad (unless)
 import Data.Text.Encoding.Error (UnicodeException)
 import qualified Data.Text as T
@@ -159,3 +163,57 @@ hGetLocalFileHeader h fh = do
     B.hGet h localFileHeaderConstantLength
   where
     offset = fromIntegral $ fhRelativeOffset fh
+
+writeLocalFileHeader :: Handle -> FileHeader -> IO ()
+writeLocalFileHeader h fh =
+    B.hPut h . runPut $ putLocalFileHeader fh
+
+
+putLocalFileHeader :: FileHeader -> Put
+putLocalFileHeader fh = do
+    putWord32le 0x04034b50
+    putWord16le 20  -- version needed to extract (>= 2.0)
+    putWord16le $ fhBitFlag fh
+    putWord16le compressionMethod
+    putWord16le $ msDOSTime modTime
+    putWord16le $ msDOSDate modTime
+    putWord32le $ fhCRC32 fh
+    putWord32le $ fhCompressedSize fh
+    putWord32le $ fhUncompressedSize fh
+    putWord16le $ fromIntegral $ B.length $ encodeUtf8 $ T.pack $ fhFileName fh
+    putWord16le $ fromIntegral $ B.length $ fhExtraField fh
+    putByteString $ encodeUtf8 $ T.pack $ fhFileName fh
+    putByteString $ fhExtraField fh
+  where
+    modTime = utcTimeToMSDOSDateTime $ fhLastModified fh
+    compressionMethod = case fhCompressionMethod fh of
+                          NoCompression -> 0
+                          Deflate       -> 8
+
+putFileHeader :: FileHeader -> Put
+putFileHeader fh = do
+    putWord32le 0x02014b50
+    putWord16le 0   -- version made by
+    putWord16le 20  -- version needed to extract (>= 2.0)
+    putWord16le $ fhBitFlag fh
+    putWord16le compressionMethod
+    putWord16le $ msDOSTime modTime
+    putWord16le $ msDOSDate modTime
+    putWord32le $ fhCRC32 fh
+    putWord32le $ fhCompressedSize fh
+    putWord32le $ fhUncompressedSize fh
+    putWord16le $ fromIntegral $ B.length $ encodeUtf8 $ T.pack $ fhFileName fh
+    putWord16le $ fromIntegral $ B.length $ fhExtraField fh
+    putWord16le $ fromIntegral $ B.length $ encodeUtf8 $ fhFileComment fh
+    putWord16le 0  -- disk number start
+    putWord16le $ fhInternalFileAttributes fh
+    putWord32le $ fhExternalFileAttributes fh
+    putWord32le $ fhRelativeOffset fh
+    putByteString $ encodeUtf8 $ T.pack $ fhFileName fh
+    putByteString $ fhExtraField fh
+    putByteString $ encodeUtf8 $ fhFileComment fh
+  where
+    modTime = utcTimeToMSDOSDateTime $ fhLastModified fh
+    compressionMethod = case fhCompressionMethod fh of
+                          NoCompression -> 0
+                          Deflate       -> 8

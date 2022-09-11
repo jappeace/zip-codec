@@ -9,7 +9,7 @@ A codec for the zip
 https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
 format.
 
-heavily inspired by zip-conduit,
+heavily inspired by [zip-conduit](https://hackage.haskell.org/package/zip-conduit),
 makes monads opt in. 
 Unlike zip which is completly baked around IO.
 
@@ -21,6 +21,23 @@ TODO:
 + [ ] get a working implementation
 + [ ] See if can get tests from other libraries
 + [ ] See if can get benchmarks
+
+
+## Alternatives
+
++ [zip](https://hackage.haskell.org/package/zip):
+  Intentionally excessivaly file based.
+  Feature rich but hard to paralize due to their monadic design.
++ [zip-conduit](https://hackage.haskell.org/package/zip-conduit): 
+  zip file reading with conduit.
+  I stole most of their sources.
+  Also used a monadic design for some reason (which I just ripped out)
+  I also exposed most of their internals which are well designed,
+  but I was carefull to add Either based error reporting rather,
+  then crashing.
++ [zip-archive](https://hackage.haskell.org/package/zip-archive):
+   loads everything in memory so only usefull for small files.
+
 
 
 ## Usage

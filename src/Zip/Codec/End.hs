@@ -1,3 +1,11 @@
+-- | The end of a zipfile has the directory layout.
+--   this module helps the decoder figure out where that is quickly
+--   by tracking the offset.
+--
+--   when decoding the first thing we have to do is find the End
+--   (marked by a signature).
+--   when encoding, for every file we have to keep on moving the offset
+--   back
 module Zip.Codec.End
   ( End(..)
   , readEnd

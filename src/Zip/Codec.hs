@@ -15,15 +15,18 @@ module Zip.Codec
   )
 where
 
+import Zip.Codec.DataDescriptor
 import Data.Text(Text)
 import Control.Exception
 import Zip.Codec.End
 import Zip.Codec.FileHeader
+import Data.Void(Void)
+import qualified Data.Conduit.Internal as CI (zipSinks)
 import           Prelude hiding (readFile, zip)
 import           Data.ByteString (ByteString)
 import           Data.Time (UTCTime(..))
 import           Data.Word
-import           System.IO (IOMode(..), SeekMode(..), hSeek, openFile, withFile)
+import           System.IO (Handle, IOMode(..), SeekMode(..), hSeek, openFile, withFile)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Trans.Resource (MonadResource)
 import           Data.Conduit (ConduitT, (.|), yield)
@@ -72,7 +75,7 @@ defOptions = MkFileContent
     { fcFileHeader = MkFileInZipOptions
       { fizCompression  = Deflate
       , fizModification = UTCTime { utctDay = toEnum 0, utctDayTime = 0}
-      , fizBitflag      = 0
+      , fizBitflag      = 2  -- max compression for deflate compression method
       , fizExtraField   = mempty
       , fizComment      = mempty
       }
@@ -122,3 +125,67 @@ sourceFile zipPath fileHeader =
         case fhCompressionMethod fileHeader of
           NoCompression -> CL.map id
           Deflate       -> decompress $ WindowBits (-15)
+
+-- | writes a single file into a zip file
+singletonZipFile :: MonadResource m => FilePath -> FilePath -> FileInZipOptions -> ConduitT ByteString o m ()
+singletonZipFile end zipPath filePath options = do
+    h  <- liftIO $ openFile zipPath WriteMode
+    fh <- liftIO $ appendLocalFileHeader h filePath options
+    dd <- sinkData h $ fizCompression options
+    liftIO $ do
+        writeDataDescriptorFields h dd offset
+        let zip' = updateZip zip fh dd
+        writeFinish h zip'
+        hClose h
+        return zip'
+  where
+    offset = fromIntegral $ zipCentralDirectoryOffset zip
+
+-- TODO append files
+
+
+appendLocalFileHeader :: Handle -> FilePath -> FileInZipOptions -> IO FileHeader
+appendLocalFileHeader handle zip filePath options = do
+    writeLocalFileHeader handle fh
+    return fh
+  where
+    offset = fromIntegral $ endCentralDirectoryOffset end
+    fh     = mkFileHeader f options (fromIntegral offset)
+
+mkFileHeader :: FilePath -> FileInZipOptions -> Word32 -> FileHeader
+mkFileHeader filePath options relativeOffset =
+    FileHeader { fhBitFlag                = fizBitflag options
+               , fhCompressionMethod      = fizCompression options
+               , fhLastModified           = fizModification options
+               , fhCRC32                  = 0
+               , fhCompressedSize         = 0
+               , fhUncompressedSize       = 0
+               , fhInternalFileAttributes = 0
+               , fhExternalFileAttributes = 0
+               , fhRelativeOffset         = relativeOffset
+               , fhFileName               = filePath
+               , fhExtraField             = empty
+               , fhFileComment            = empty
+               }
+
+sinkData :: MonadResource m
+         => Handle -> CompressionMethod -> ConduitT ByteString Void m DataDescriptor
+sinkData h compression = do
+    ((uncompressedSize, crc32), compressedSize) <-
+        case compression of
+          NoCompression -> CI.zipSinks sizeCrc32Sink sizeDataSink
+          Deflate       -> CI.zipSinks sizeCrc32Sink compressSink
+    return DataDescriptor
+               { ddCRC32            = crc32
+               , ddCompressedSize   = fromIntegral compressedSize
+               , ddUncompressedSize = fromIntegral uncompressedSize
+               }
+  where
+    compressSink :: MonadResource m => ConduitT ByteString Void m Int
+    compressSink = compress 6 (WindowBits (-15)) =$ sizeDataSink
+
+    sizeCrc32Sink :: MonadResource m => ConduitT ByteString Void m (Int, Word32)
+    sizeCrc32Sink =  CI.zipSinks sizeSink crc32Sink
+
+    sizeDataSink :: MonadResource m => ConduitT ByteString Void m Int
+    sizeDataSink  = fst <$> CI.zipSinks sizeSink (CB.sinkHandle h)

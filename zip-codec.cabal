@@ -25,8 +25,10 @@ source-repository head
 
 library
   exposed-modules:
+      Main
       Zip.Codec
       Zip.Codec.CentralDirectory
+      Zip.Codec.DataDescriptor
       Zip.Codec.End
       Zip.Codec.FileHeader
       Zip.Codec.Time
@@ -80,6 +82,7 @@ executable exe
   other-modules:
       Zip.Codec
       Zip.Codec.CentralDirectory
+      Zip.Codec.DataDescriptor
       Zip.Codec.End
       Zip.Codec.FileHeader
       Zip.Codec.Time
