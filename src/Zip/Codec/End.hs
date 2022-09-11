@@ -12,6 +12,7 @@ module Zip.Codec.End
   , getEnd
   , writeEnd
   , putEnd
+  , emptyEnd
   )
 where
 
@@ -20,7 +21,6 @@ import qualified Data.ByteString as B
 import Data.Serialize.Get
 import Data.Serialize.Put
 import           System.IO (Handle, SeekMode(..), hFileSize, hSeek, hTell)
-import Data.Word
 
 
 -- | End of central directory record:
@@ -45,6 +45,12 @@ data End = End
     , endZipComment             :: ByteString
     } deriving (Show)
 
+emptyEnd :: End
+emptyEnd = End
+    { endCentralDirectorySize   = 0
+    , endCentralDirectoryOffset = 0
+    , endZipComment             = mempty
+    }
 
 readEnd :: Handle -> IO (Either String End)
 readEnd h =

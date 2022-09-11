@@ -69,18 +69,10 @@ dependencies:
 - transformers
 - primitive
 - exceptions
+- digest
 
 library:
   source-dirs: src
-
-executables:
-  exe:
-    main:                Main.hs
-    source-dirs:         src
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
 
 tests:
   unit:

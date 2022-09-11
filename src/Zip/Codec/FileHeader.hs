@@ -1,3 +1,5 @@
+-- | Every file in a zipfile has a header giving some meta data
+--   on what is in the file. such as compression method and the name.
 module Zip.Codec.FileHeader
   ( getFileHeader
   , FileHeader(..)
@@ -7,6 +9,7 @@ module Zip.Codec.FileHeader
   , writeLocalFileHeader
   , putLocalFileHeader
   , putFileHeader
+  , localFileHeaderLength
   )
 where
 
@@ -61,7 +64,7 @@ data FileHeader = FileHeader
     , fhFileName               :: FilePath
     , fhExtraField             :: ByteString
     , fhFileComment            :: Text
-    } deriving (Show)
+    } deriving (Show, Eq)
 
 
 data CompressionMethod = NoCompression
@@ -70,7 +73,7 @@ data CompressionMethod = NoCompression
 
 data GetFileHeaderError = DecodeFileNameFailed { original :: ByteString, exception :: UnicodeException}
                         | DecodeCommentFailed { original :: ByteString, exception :: UnicodeException}
-                        deriving Show
+                        deriving (Show, Eq)
 
 getFileHeader :: Get (Either GetFileHeaderError FileHeader)
 getFileHeader = do
@@ -217,3 +220,8 @@ putFileHeader fh = do
     compressionMethod = case fhCompressionMethod fh of
                           NoCompression -> 0
                           Deflate       -> 8
+
+localFileHeaderLength :: FileHeader -> Word32
+localFileHeaderLength fh =
+  fromIntegral $ 4 + 2 + 2 + 2 + 2 + 2 + 4 + 4 + 4 + 2 + 2
+               + length (fhFileName fh) + B.length (fhExtraField fh)

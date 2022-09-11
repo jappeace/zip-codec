@@ -1,5 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- | Indicates what file is where in a zipfile.
+--   this is simalar to a file table (fat)
 module Zip.Codec.CentralDirectory
   ( CentralDirectory(..)
   , readCentralDirectory
@@ -7,6 +9,7 @@ module Zip.Codec.CentralDirectory
   , CenteralDirErrors(..)
   , writeCentralDirectory
   , putCentralDirectory
+  , emptyCentralDirectory
   )
 where
 
@@ -35,7 +38,10 @@ data CentralDirectory = CentralDirectory
     -- a hashmap maybe faster but it opens up a DoS vulnrability
     -- due to fnv being vulnrable to universal collisions.
     { cdFileHeaders      :: Map FilePath FileHeader -- this representation will filter out double files for better or worse.
-    } deriving (Show)
+    } deriving (Show, Eq)
+
+emptyCentralDirectory :: CentralDirectory
+emptyCentralDirectory = CentralDirectory mempty
 
 data CenteralDirErrors = MkGetErrors String
                        | FileDecodeErrors GetFileHeaderError
@@ -43,17 +49,19 @@ data CenteralDirErrors = MkGetErrors String
 
 readCentralDirectory :: Handle -> End -> IO (Either CenteralDirErrors CentralDirectory)
 readCentralDirectory h e = do
+    print ("geting central dir of end", e)
     bs <- hGetCentralDirectory h e
+    putStrLn "resulting"
     pure $
       first FileDecodeErrors =<< (first MkGetErrors $ runGet getCentralDirectory bs)
 
 getCentralDirectory :: Get (Either GetFileHeaderError CentralDirectory)
 getCentralDirectory = do
-    headers' :: [Maybe (Either GetFileHeaderError FileHeader)] <- many $ maybeEmpty $ getFileHeader
+    headers' :: [(Either GetFileHeaderError FileHeader)] <- many $ getFileHeader
 
     -- TODO collect all decode errors rather then squashing
     let headersE :: Either GetFileHeaderError [FileHeader]
-        headersE = sequence $ catMaybes headers'
+        headersE = sequence headers'
     return $ headersE <&> \headers ->
       CentralDirectory { cdFileHeaders =
                          fromList $ (\header -> (fhFileName header, header)) <$> headers }
@@ -65,13 +73,6 @@ hGetCentralDirectory h e = do
   where
     size'  = endCentralDirectorySize e
     offset = endCentralDirectoryOffset e
-
-maybeEmpty :: Get a -> Get (Maybe a)
-maybeEmpty p = do
-    e <- isEmpty
-    if e
-      then return Nothing
-      else Just <$> p
 
 writeCentralDirectory :: Handle -> CentralDirectory -> IO ()
 writeCentralDirectory h cd =

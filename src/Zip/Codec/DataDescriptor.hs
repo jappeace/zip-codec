@@ -1,3 +1,6 @@
+
+-- | This is used to indicate the shape of a file,
+--   it includes a checksum, compressed and uncompressed sizes.
 module Zip.Codec.DataDescriptor
   ( DataDescriptor(..)
   , writeDataDescriptorFields
@@ -6,9 +9,9 @@ module Zip.Codec.DataDescriptor
   )
 where
 
-import           System.IO (Handle, SeekMode(..), hFileSize, hSeek, hTell)
+import           System.IO
 import Data.Word
-import           Data.Serialize (Get, Put, getByteString, getWord16le, getWord32le, putByteString, putWord16le, putWord32le, runPut, skip)
+import           Data.Serialize
 import qualified Data.ByteString as B
 
 -- | Data descriptor

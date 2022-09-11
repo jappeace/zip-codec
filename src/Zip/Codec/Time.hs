@@ -1,3 +1,4 @@
+-- | zip related time odds and ends
 module Zip.Codec.Time
   ( MSDOSDateTime(..)
   , msDOSDateTimeToUTCTime

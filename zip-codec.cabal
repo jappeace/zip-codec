@@ -25,13 +25,14 @@ source-repository head
 
 library
   exposed-modules:
-      Main
       Zip.Codec
       Zip.Codec.CentralDirectory
       Zip.Codec.DataDescriptor
       Zip.Codec.End
       Zip.Codec.FileHeader
+      Zip.Codec.Read
       Zip.Codec.Time
+      Zip.Codec.Write
   other-modules:
       Paths_zip_codec
   hs-source-dirs:
@@ -65,59 +66,7 @@ library
     , conduit
     , conduit-extra
     , containers
-    , directory
-    , exceptions
-    , filepath
-    , mtl
-    , old-time
-    , primitive
-    , resourcet
-    , text
-    , time
-    , transformers
-  default-language: Haskell2010
-
-executable exe
-  main-is: Main.hs
-  other-modules:
-      Zip.Codec
-      Zip.Codec.CentralDirectory
-      Zip.Codec.DataDescriptor
-      Zip.Codec.End
-      Zip.Codec.FileHeader
-      Zip.Codec.Time
-      Paths_zip_codec
-  hs-source-dirs:
-      src
-  default-extensions:
-      EmptyCase
-      FlexibleContexts
-      FlexibleInstances
-      InstanceSigs
-      MultiParamTypeClasses
-      LambdaCase
-      MultiWayIf
-      NamedFieldPuns
-      TupleSections
-      DeriveFoldable
-      DeriveFunctor
-      DeriveGeneric
-      DeriveLift
-      DeriveTraversable
-      DerivingStrategies
-      GeneralizedNewtypeDeriving
-      StandaloneDeriving
-      OverloadedStrings
-      TypeApplications
-  ghc-options: -Wall -Wcompat -Wincomplete-uni-patterns -Wredundant-constraints -Wincomplete-record-updates -Widentities -Wcpp-undef -fwarn-tabs -Wpartial-fields -fdefer-diagnostics -Wunused-packages -threaded -rtsopts -with-rtsopts=-N
-  build-depends:
-      base >=4.7 && <5
-    , binary
-    , bytestring
-    , cereal
-    , conduit
-    , conduit-extra
-    , containers
+    , digest
     , directory
     , exceptions
     , filepath
@@ -166,6 +115,7 @@ test-suite unit
     , conduit
     , conduit-extra
     , containers
+    , digest
     , directory
     , exceptions
     , filepath
