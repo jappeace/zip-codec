@@ -45,7 +45,7 @@ data End = End
     , endCentralDirectorySize   :: Word32 -- ^ size of the central directory
     , endCentralDirectoryOffset :: Word32 -- ^ offset of start of central
     , endZipComment             :: ByteString
-    } deriving (Show)
+    } deriving (Show, Eq)
 
 emptyEnd :: End
 emptyEnd = End
@@ -61,7 +61,7 @@ readEnd h =
 
 getEnd :: Get End
 getEnd = do
-   skip $ 2 + 2 + 2
+   skip $ 4 + 2 + 2 + 2
    entries       <- getWord16le
    size          <- getWord32le
    offset        <- getWord32le
@@ -88,6 +88,7 @@ hGetEnd h = do
           else next
 
     get = do
+        hSeek h RelativeSeek (-4)
         size   <- hFileSize h
         offset <- hTell h
         B.hGet h $ fromIntegral (size - offset)
@@ -110,5 +111,5 @@ putEnd end = do
     putWord32le $ endCentralDirectorySize  end -- size of central directory
     putWord32le $ endCentralDirectoryOffset end -- offset of central dir
     -- TODO: put comment
-    putWord16le 0
-    putByteString B.empty
+    putWord16le $ fromIntegral $ B.length $ endZipComment end
+    putByteString (endZipComment end)

@@ -29,7 +29,7 @@ import Zip.Codec.FileHeader
 import           Prelude hiding (readFile, zip)
 import           Data.ByteString (ByteString)
 import           Data.Time (UTCTime(..))
-import           System.IO (Handle, IOMode(..), SeekMode(..), hSeek, openFile, withFile)
+import           System.IO (IOMode(..), withFile)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Trans.Resource
 import           Data.Conduit (ConduitT, (.|), yield)
@@ -55,11 +55,8 @@ data FileContent m = MkFileContent
 readZipFile :: (MonadThrow m, PrimMonad m, MonadResource m) => FilePath -> IO (Either CodecErrors (Map FilePath (FileContent m)))
 readZipFile zipPath =
     withFile zipPath ReadMode $ \handle' -> runExceptT $ do
-      liftIO $ putStrLn "readnig end"
       end <- except . first FailedEndReading =<< liftIO (readEnd handle')
-      liftIO $ putStrLn "reading central dir"
       central <- except . first FailedCentralDirectoryReading =<< liftIO (readCentralDirectory handle' end)
-      liftIO $ print ("returning conduit", central)
       pure $
         (\header -> ( MkFileContent
                   { fcFileHeader = fromFileHeader header

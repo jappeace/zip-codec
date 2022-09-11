@@ -86,3 +86,4 @@ tests:
     - zip-codec
     - temporary
     - lens
+    - quickcheck-instances

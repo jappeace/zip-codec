@@ -1,23 +1,28 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
+
 module Main where
 
+import Zip.Codec.End
+import Data.Text.Encoding(encodeUtf8)
 import Control.Monad
 import Data.Conduit
-import Data.Traversable
 import qualified Data.Conduit.Combinators as C
 import Zip.Codec.CentralDirectory
 import Data.Serialize.Get
+import Data.Serialize.Put
 import Test.Tasty
 import Test.Tasty.HUnit
 import qualified Data.Map as Map
 import System.IO.Temp(withSystemTempDirectory)
 import           System.FilePath ((</>))
 import Control.Exception
-import           Data.List ((\\))
 import Control.Monad.Trans.Resource
 import Zip.Codec
 import Control.Lens
 import Zip.Codec.FileHeader
-import Control.Applicative(many)
+import Test.Tasty.QuickCheck as QC
+import Test.QuickCheck.Instances()
 
 main :: IO ()
 main = defaultMain tests
@@ -35,9 +40,19 @@ tests =
 
                 , testCase "see if it can handle empty string" readCentralDir
                 , testCase "see if file header can read" readFileHeader
+                , QC.testProperty "endRoundTrip" endRoundTrip
                 ]
 
 -- TODO property tests for all get/puts
+
+instance Arbitrary End where
+  arbitrary = End <$> arbitrary <*> arbitrary <*> arbitrary <*> (encodeUtf8 <$> arbitrary)
+
+endRoundTrip :: End -> Property
+endRoundTrip end =
+  let out = runGet getEnd (runPut (putEnd end))
+  in
+  counterexample ("got this output: \n " <> show out) $ out == Right end
 
 
 -- this caused segaults in ghc runtime before, see https://github.com/GaloisInc/cereal/issues/105
@@ -81,10 +96,10 @@ assertFileContenTheSame = do
             throwIO errors
           Right result -> do
             assertEqual "length same" (length entriesInfo) (length result)
-            void $ forM (zip entriesInfo (Map.toList result)) $ \((efileName, econtent), (rfileName, fcontent)) -> do
+            void $ forM (zip entriesInfo (Map.toList result)) $ \((efileName, econtent), (_rfileName, fcontent)) -> do
                 expected  <- runConduitRes $ fcFileContents econtent .| C.fold
                 resulted <- runConduitRes $ fcFileContents fcontent .| C.fold
-                assertEqual "same content" expected resulted
+                assertEqual ("same content" <> efileName) expected resulted
   where
     archiveName = "test.zip"
     entriesInfo :: [(FilePath, FileContent (ResourceT IO))]

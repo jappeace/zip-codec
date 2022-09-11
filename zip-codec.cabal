@@ -123,6 +123,7 @@ test-suite unit
     , mtl
     , old-time
     , primitive
+    , quickcheck-instances
     , resourcet
     , tasty
     , tasty-hunit

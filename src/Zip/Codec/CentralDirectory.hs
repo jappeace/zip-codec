@@ -22,7 +22,6 @@ import           Data.ByteString (ByteString)
 import           System.IO (Handle, SeekMode(..),  hSeek)
 import Zip.Codec.End
 import Control.Applicative(many)
-import Data.Maybe(catMaybes)
 import Data.Functor((<&>))
 import Data.Bifunctor
 
@@ -49,9 +48,7 @@ data CenteralDirErrors = MkGetErrors String
 
 readCentralDirectory :: Handle -> End -> IO (Either CenteralDirErrors CentralDirectory)
 readCentralDirectory h e = do
-    print ("geting central dir of end", e)
     bs <- hGetCentralDirectory h e
-    putStrLn "resulting"
     pure $
       first FileDecodeErrors =<< (first MkGetErrors $ runGet getCentralDirectory bs)
 
@@ -68,7 +65,7 @@ getCentralDirectory = do
 
 hGetCentralDirectory :: Handle -> End -> IO ByteString
 hGetCentralDirectory h e = do
-    hSeek h AbsoluteSeek $ fromIntegral offset
+    hSeek h AbsoluteSeek offset
     B.hGet h size'
   where
     size'  = fromIntegral $ endCentralDirectorySize e
