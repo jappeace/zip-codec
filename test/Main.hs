@@ -1,5 +1,9 @@
 module Main where
 
+import Control.Monad
+import Data.Conduit
+import Data.Traversable
+import qualified Data.Conduit.Combinators as C
 import Zip.Codec.CentralDirectory
 import Data.Serialize.Get
 import Test.Tasty
@@ -23,6 +27,7 @@ tests =
     testGroup "Unit tests"
                 [
                   testCase "file headers same" assertFileHeadersSame
+                , testCase "file content same" assertFileContenTheSame
                 -- , testCase "conduit uncompressed" (assertFileHeadersSame sinkEntryUncompressed)
                 -- -- , testCase "conduit parallel" (assertFileHeadersSame sinkEntryUncompressed)
                 -- , testCase "files      " (assertFiles Nothing)
@@ -44,25 +49,42 @@ readFileHeader :: IO ()
 readFileHeader =
   assertEqual "file header same" (Left "too few bytes\nFrom:\tdemandInput\n\n") (runGet getFileHeader mempty)
 
+-- TODO covnert into property tests
 assertFileHeadersSame :: IO ()
 assertFileHeadersSame = do
-    putStrLn "wnetering"
     withSystemTempDirectory "zip-conduit" $ \dir -> do
         let archivePath = dir </> archiveName
-
-        putStrLn "writing zip file"
         _ <- writeZipFile archivePath $ Map.fromList entriesInfo
-        putStrLn "reading zip file"
         result' <- readZipFile @(ResourceT IO) archivePath
-        putStrLn "read zip file"
         case result' of
-          Left errors -> do
-            putStrLn "dying"
+          Left errors ->
             throwIO errors
-          Right result -> do
-            putStrLn "asserting equal"
+          Right result ->
             assertEqual "list diff is same" (over (mapped . _2) fcFileHeader entriesInfo)
                                             ((over (mapped . _2) fcFileHeader $ Map.toList result))
+  where
+    archiveName = "test.zip"
+    entriesInfo :: [(FilePath, FileContent (ResourceT IO))]
+    entriesInfo = [ ("test1.txt", appendBytestring "some test text" defOptions)
+                  , ("test2.txt", appendBytestring "some another test text" defOptions)
+                  , ("test3.txt", appendBytestring "one more" defOptions)
+                  ]
+
+assertFileContenTheSame :: IO ()
+assertFileContenTheSame = do
+    withSystemTempDirectory "zip-conduit" $ \dir -> do
+        let archivePath = dir </> archiveName
+        _ <- writeZipFile archivePath $ Map.fromList entriesInfo
+        result' <- readZipFile @(ResourceT IO) archivePath
+        case result' of
+          Left errors ->
+            throwIO errors
+          Right result -> do
+            assertEqual "length same" (length entriesInfo) (length result)
+            void $ forM (zip entriesInfo (Map.toList result)) $ \((efileName, econtent), (rfileName, fcontent)) -> do
+                expected  <- runConduitRes $ fcFileContents econtent .| C.fold
+                resulted <- runConduitRes $ fcFileContents fcontent .| C.fold
+                assertEqual "same content" expected resulted
   where
     archiveName = "test.zip"
     entriesInfo :: [(FilePath, FileContent (ResourceT IO))]
