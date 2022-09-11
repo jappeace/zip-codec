@@ -60,6 +60,7 @@ updateEnd :: DataDescriptor -> FileHeader -> End -> End
 updateEnd dd fh end = end {
   endCentralDirectoryOffset = endCentralDirectoryOffset end
                             + fromIntegral (localFileHeaderLength fh + ddCompressedSize dd)
+  , endCentralDirectorySize = endCentralDirectorySize end + fromIntegral (fileHeaderLength fh)
   }
 
 updateFileHeader :: DataDescriptor -> FileHeader -> FileHeader
@@ -76,7 +77,7 @@ writeFinish h centralDir end = do
     writeCentralDirectory h centralDir
     writeEnd h
              (length $ cdFileHeaders centralDir)                      -- total number of entries in the central directory on this disk
-             end
+             $ end
 
 
 appendLocalFileHeader :: Handle -> End -> FilePath -> FileInZipOptions -> IO FileHeader

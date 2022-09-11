@@ -10,6 +10,7 @@ module Zip.Codec.FileHeader
   , putLocalFileHeader
   , putFileHeader
   , localFileHeaderLength
+  , fileHeaderLength
   )
 where
 
@@ -225,3 +226,9 @@ localFileHeaderLength :: FileHeader -> Word32
 localFileHeaderLength fh =
   fromIntegral $ 4 + 2 + 2 + 2 + 2 + 2 + 4 + 4 + 4 + 2 + 2
                + length (fhFileName fh) + B.length (fhExtraField fh)
+
+fileHeaderLength :: FileHeader -> Word32
+fileHeaderLength fh =
+  fromIntegral $ 4 + 2 + 2 + 2 + 2 + 2 + 2 + 4 + 4 + 4 + 2 + 2 + 2 + 2 + 2 + 4 + 4
+               + length (fhFileName fh) + B.length (fhExtraField fh)
+               + B.length (encodeUtf8 $ fhFileComment fh)
