@@ -75,9 +75,7 @@ updateFileHeader dd fh = fh { fhCRC32            = ddCRC32 dd
 writeFinish :: Handle -> CentralDirectory -> End -> IO ()
 writeFinish h centralDir end = do
     writeCentralDirectory h centralDir
-    writeEnd h
-             (length $ cdFileHeaders centralDir)                      -- total number of entries in the central directory on this disk
-             $ end
+    writeEnd h $ end{ endEntriesCount = fromIntegral (length $ cdFileHeaders centralDir) }
 
 
 appendLocalFileHeader :: Handle -> End -> FilePath -> FileInZipOptions -> IO FileHeader

@@ -15,7 +15,6 @@ module Zip.Codec.FileHeader
 where
 
 import Data.Text(Text)
-import Data.Time
 import           System.IO (Handle, SeekMode(..), hSeek)
 import Data.Serialize.Get
 import           Data.Serialize
@@ -122,11 +121,6 @@ getFileHeader = do
                , fhExtraField             = extraField
                , fhFileComment            = comment
                }
-  where
-    toUTC date time =
-        msDOSDateTimeToUTCTime MSDOSDateTime { msDOSDate = date
-                                             , msDOSTime = time
-                                             }
 
 calculateFileDataOffset :: Handle -> FileHeader -> IO (Either String Integer)
 calculateFileDataOffset h fh = do

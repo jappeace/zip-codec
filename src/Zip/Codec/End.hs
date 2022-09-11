@@ -41,8 +41,9 @@ import           System.IO (Handle, SeekMode(..), hFileSize, hSeek, hTell)
 -- .ZIP file comment length        2 bytes
 -- .ZIP file comment       (variable size)
 data End = End
-    { endCentralDirectorySize   :: Word32
-    , endCentralDirectoryOffset :: Word32
+    { endEntriesCount           :: Word16 -- ^ total number of entries in the central directory on this disk
+    , endCentralDirectorySize   :: Word32 -- ^ size of the central directory
+    , endCentralDirectoryOffset :: Word32 -- ^ offset of start of central
     , endZipComment             :: ByteString
     } deriving (Show)
 
@@ -50,6 +51,7 @@ emptyEnd :: End
 emptyEnd = End
     { endCentralDirectorySize   = 0
     , endCentralDirectoryOffset = 0
+    , endEntriesCount           = 0
     , endZipComment             = mempty
     }
 
@@ -59,7 +61,8 @@ readEnd h =
 
 getEnd :: Get End
 getEnd = do
-   skip $ 2 + 2 + 2 + 2
+   skip $ 2 + 2 + 2
+   entries       <- getWord16le
    size          <- getWord32le
    offset        <- getWord32le
    commentLength <- fromIntegral <$> getWord16le
@@ -67,6 +70,7 @@ getEnd = do
    return End { endCentralDirectorySize   = size
               , endCentralDirectoryOffset = offset
               , endZipComment             = comment
+              , endEntriesCount           = entries
               }
 
 
@@ -93,20 +97,18 @@ hGetEnd h = do
         loop
 
 -- todo align with read end
-writeEnd :: Handle -> Int -> End -> IO ()
-writeEnd h number end =
-     B.hPut h . runPut $ putEnd number end
+writeEnd :: Handle -> End -> IO ()
+writeEnd h = B.hPut h . runPut . putEnd
 
-
-putEnd :: Int -> End -> Put
-putEnd number end = do
+putEnd :: End -> Put
+putEnd end = do
     putWord32le 0x06054b50
     putWord16le 0                      -- disk number
     putWord16le 0                      -- disk number of central directory
-    putWord16le $ fromIntegral number  -- number of entries this disk
-    putWord16le $ fromIntegral number  -- number of entries
-    putWord32le $ fromIntegral $ endCentralDirectorySize  end -- size of central directory
-    putWord32le $ fromIntegral $ endCentralDirectoryOffset end -- offset of central dir
+    putWord16le $ endEntriesCount end -- number of entries this disk
+    putWord16le $ endEntriesCount end -- number of entries in central directory
+    putWord32le $ endCentralDirectorySize  end -- size of central directory
+    putWord32le $ endCentralDirectoryOffset end -- offset of central dir
     -- TODO: put comment
     putWord16le 0
     putByteString B.empty
