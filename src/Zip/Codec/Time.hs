@@ -16,9 +16,10 @@ import           Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 data MSDOSDateTime = MSDOSDateTime
     { msDOSDate :: Word16
     , msDOSTime :: Word16
-    } deriving (Show)
+    } deriving (Show, Eq)
 
 
+-- | convert a utc time to msdosdate time
 msDOSDateTimeToUTCTime :: MSDOSDateTime -> UTCTime
 msDOSDateTimeToUTCTime dosDateTime =
     UTCTime { utctDay = fromGregorian year month day
@@ -37,7 +38,9 @@ msDOSDateTimeToUTCTime dosDateTime =
     dosDate = msDOSDate dosDateTime
     dosTime = msDOSTime dosDateTime
 
-
+-- | convert a utc time to msdosdate time, not that this silently
+--   clamps the UTCTime to fit within the msdos ime
+--   meaning for example we can't represent dates before 1986-11-17
 utcTimeToMSDOSDateTime :: UTCTime -> MSDOSDateTime
 utcTimeToMSDOSDateTime utcTime =
     MSDOSDateTime { msDOSDate = dosDate

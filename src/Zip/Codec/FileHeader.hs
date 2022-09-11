@@ -55,7 +55,7 @@ import Data.Bifunctor
 data FileHeader = FileHeader
     { fhBitFlag                :: Word16
     , fhCompressionMethod      :: CompressionMethod
-    , fhLastModified           :: UTCTime
+    , fhLastModified           :: MSDOSDateTime
     , fhCRC32                  :: Word32
     , fhCompressedSize         :: Word32
     , fhUncompressedSize       :: Word32
@@ -111,7 +111,7 @@ getFileHeader = do
       pure $ FileHeader
                { fhBitFlag                = bitFlag
                , fhCompressionMethod      = compessionMethod
-               , fhLastModified           = toUTC lastModFileDate lastModFileTime
+               , fhLastModified           = MSDOSDateTime { msDOSDate = lastModFileDate, msDOSTime = lastModFileTime}
                , fhCRC32                  = crc32
                , fhCompressedSize         = compressedSize
                , fhUncompressedSize       = uncompressedSize
@@ -189,7 +189,7 @@ putLocalFileHeader fh = do
     putByteString $ encodeUtf8 $ T.pack $ fhFileName fh
     putByteString $ fhExtraField fh
   where
-    modTime = utcTimeToMSDOSDateTime $ fhLastModified fh
+    modTime = fhLastModified fh
     compressionMethod = case fhCompressionMethod fh of
                           NoCompression -> 0
                           Deflate       -> 8
@@ -217,7 +217,7 @@ putFileHeader fh = do
     putByteString $ fhExtraField fh
     putByteString $ encodeUtf8 $ fhFileComment fh
   where
-    modTime = utcTimeToMSDOSDateTime $ fhLastModified fh
+    modTime = fhLastModified fh
     compressionMethod = case fhCompressionMethod fh of
                           NoCompression -> 0
                           Deflate       -> 8

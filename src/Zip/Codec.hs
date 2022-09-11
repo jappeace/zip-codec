@@ -17,6 +17,7 @@ module Zip.Codec
   )
 where
 
+import Zip.Codec.Time
 import qualified Data.Map as Map
 import Control.Monad.Trans.Class
 import Data.Traversable
@@ -92,7 +93,7 @@ defOptions :: Monad m => FileContent m
 defOptions = MkFileContent
     { fcFileHeader = MkFileInZipOptions
       { fizCompression  = Deflate
-      , fizModification = UTCTime { utctDay = toEnum 0, utctDayTime = 0}
+      , fizModification = msDOSDateTimeToUTCTime $ utcTimeToMSDOSDateTime (UTCTime { utctDay = toEnum 0, utctDayTime = 0})
       , fizBitflag      = 2  -- max compression for deflate compression method
       , fizExtraField   = mempty
       , fizComment      = mempty

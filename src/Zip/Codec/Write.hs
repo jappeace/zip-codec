@@ -9,6 +9,7 @@ module Zip.Codec.Write
   )
 where
 
+import Zip.Codec.Time
 import qualified Data.Map as Map
 import Zip.Codec.DataDescriptor
 import Data.Text(Text)
@@ -32,7 +33,6 @@ import           Data.Conduit.Zlib (WindowBits(..), compress)
 import Zip.Codec.CentralDirectory
 import Control.Monad.Primitive
 import Control.Monad.Catch (MonadThrow)
-
 
 -- | writes a single file into a zip file
 --   note that this doesn't write a fisih
@@ -93,7 +93,7 @@ mkFileHeader :: FilePath -> FileInZipOptions -> Word32 -> FileHeader
 mkFileHeader filePath options relativeOffset =
     FileHeader { fhBitFlag                = fizBitflag options
                , fhCompressionMethod      = fizCompression options
-               , fhLastModified           = fizModification options
+               , fhLastModified           = utcTimeToMSDOSDateTime $ fizModification options
                , fhCRC32                  = 0
                , fhCompressedSize         = 0
                , fhUncompressedSize       = 0
@@ -138,6 +138,8 @@ sizeSink =
 
 data FileInZipOptions = MkFileInZipOptions {
     fizCompression  :: CompressionMethod
+    -- | the modification time, not that this is clamped to 'MSDOSDateTime' (silently)
+    --   see 'utcTimeToMSDOSDateTime' for details
   , fizModification :: UTCTime
   , fizBitflag      :: Word16
   , fizExtraField   :: ByteString
@@ -148,7 +150,7 @@ fromFileHeader :: FileHeader -> FileInZipOptions
 fromFileHeader FileHeader{..} =
   MkFileInZipOptions
   { fizCompression  = fhCompressionMethod
-  , fizModification = fhLastModified
+  , fizModification = msDOSDateTimeToUTCTime fhLastModified
   , fizBitflag      = fhBitFlag
   , fizExtraField   = fhExtraField
   , fizComment      = fhFileComment
