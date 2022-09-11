@@ -24,6 +24,8 @@ tests =
                 -- , testCase "files-as   " (assertFiles $ Just ("contents" </>))
                 ]
 
+-- TODO property tests for all get/puts
+
 assertFileHeadersSame :: IO ()
 assertFileHeadersSame =
     withSystemTempDirectory "zip-conduit" $ \dir -> do

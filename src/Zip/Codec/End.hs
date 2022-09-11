@@ -10,13 +10,17 @@ module Zip.Codec.End
   ( End(..)
   , readEnd
   , getEnd
+  , writeEnd
+  , putEnd
   )
 where
 
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import Data.Serialize.Get
+import Data.Serialize.Put
 import           System.IO (Handle, SeekMode(..), hFileSize, hSeek, hTell)
+import Data.Word
 
 
 -- | End of central directory record:
@@ -80,3 +84,22 @@ hGetEnd h = do
     next = do
         hSeek h RelativeSeek (-5)
         loop
+
+-- todo align with read end
+writeEnd :: Handle -> Int -> End -> IO ()
+writeEnd h number end =
+     B.hPut h . runPut $ putEnd number end
+
+
+putEnd :: Int -> End -> Put
+putEnd number end = do
+    putWord32le 0x06054b50
+    putWord16le 0                      -- disk number
+    putWord16le 0                      -- disk number of central directory
+    putWord16le $ fromIntegral number  -- number of entries this disk
+    putWord16le $ fromIntegral number  -- number of entries
+    putWord32le $ fromIntegral $ endCentralDirectorySize  end -- size of central directory
+    putWord32le $ fromIntegral $ endCentralDirectoryOffset end -- offset of central dir
+    -- TODO: put comment
+    putWord16le 0
+    putByteString B.empty

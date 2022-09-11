@@ -127,21 +127,26 @@ sourceFile zipPath fileHeader =
           Deflate       -> decompress $ WindowBits (-15)
 
 -- | writes a single file into a zip file
+--   note that this doesn't write a fisih
 singletonZipFile :: MonadResource m => FilePath -> FilePath -> FileInZipOptions -> ConduitT ByteString o m ()
 singletonZipFile end zipPath filePath options = do
-    h  <- liftIO $ openFile zipPath WriteMode
+    bracketP (openFile zipPath WriteMode) hClose $ \handle ->
     fh <- liftIO $ appendLocalFileHeader h filePath options
     dd <- sinkData h $ fizCompression options
-    liftIO $ do
-        writeDataDescriptorFields h dd offset
-        let zip' = updateZip zip fh dd
-        writeFinish h zip'
-        hClose h
-        return zip'
+    liftIO $ writeDataDescriptorFields h dd offset
+    pure dd
   where
     offset = fromIntegral $ zipCentralDirectoryOffset zip
 
 -- TODO append files
+
+
+writeFinish :: Handle -> CentralDirectory -> End -> IO ()
+writeFinish h centralDir end = do
+    writeCentralDirectory h centralDir
+    writeEnd h
+             (length $ cdFileHeaders centralDir)                      -- total number of entries in the central directory on this disk
+             end
 
 
 appendLocalFileHeader :: Handle -> FilePath -> FileInZipOptions -> IO FileHeader
