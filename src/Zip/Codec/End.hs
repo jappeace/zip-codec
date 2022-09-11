@@ -16,6 +16,7 @@ module Zip.Codec.End
   )
 where
 
+import Data.Word
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import Data.Serialize.Get
@@ -40,8 +41,8 @@ import           System.IO (Handle, SeekMode(..), hFileSize, hSeek, hTell)
 -- .ZIP file comment length        2 bytes
 -- .ZIP file comment       (variable size)
 data End = End
-    { endCentralDirectorySize   :: Int
-    , endCentralDirectoryOffset :: Int
+    { endCentralDirectorySize   :: Word32
+    , endCentralDirectoryOffset :: Word32
     , endZipComment             :: ByteString
     } deriving (Show)
 
@@ -59,8 +60,8 @@ readEnd h =
 getEnd :: Get End
 getEnd = do
    skip $ 2 + 2 + 2 + 2
-   size          <- fromIntegral <$> getWord32le
-   offset        <- fromIntegral <$> getWord32le
+   size          <- getWord32le
+   offset        <- getWord32le
    commentLength <- fromIntegral <$> getWord16le
    comment       <- getByteString commentLength
    return End { endCentralDirectorySize   = size

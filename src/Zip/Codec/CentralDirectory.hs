@@ -71,8 +71,8 @@ hGetCentralDirectory h e = do
     hSeek h AbsoluteSeek $ fromIntegral offset
     B.hGet h size'
   where
-    size'  = endCentralDirectorySize e
-    offset = endCentralDirectoryOffset e
+    size'  = fromIntegral $ endCentralDirectorySize e
+    offset = fromIntegral $ endCentralDirectoryOffset e
 
 writeCentralDirectory :: Handle -> CentralDirectory -> IO ()
 writeCentralDirectory h cd =
