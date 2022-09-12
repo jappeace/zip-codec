@@ -59,3 +59,6 @@ bundle:
 	rm -f result
 	nix-build nix/bundle.nix
 	mv result template
+
+zip:
+	zip -r test/somezip.zip somezip
