@@ -19,15 +19,17 @@ input file/bytestring.
 TODO:
 
 + [x] get a working implementation
-+ [ ] See if can get tests from other libraries
++ [x] See if can get tests from other libraries
+  (I pobably can add more but better to focus on main value first which is
+  parlalization/speed)
 + [ ] See if can get benchmarks
-
 
 ## Alternatives
 
 + [zip](https://hackage.haskell.org/package/zip):
   Intentionally excessivaly file based.
   Feature rich but hard to paralize due to their monadic design.
+  A PR to this library won't work because it'll be incredibly breaking.
 + [zip-conduit](https://hackage.haskell.org/package/zip-conduit): 
   zip file reading with conduit.
   I stole most of their sources.
