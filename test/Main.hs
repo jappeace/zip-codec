@@ -5,6 +5,9 @@
 
 module Main where
 
+import Control.Monad.IO.Class
+import Test.QuickCheck.Monadic
+import Zip.Codec.Write
 import Zip.Codec.DataDescriptor
 import Zip.Codec.Time
 import Zip.Codec.End
@@ -35,12 +38,8 @@ tests :: TestTree
 tests =
     testGroup "Unit tests"
                 [
-                  testCase "file headers same" assertFileHeadersSame
+                  QC.testProperty "file headers same" $ forAll arbitrary $ \vals -> monadicIO $ assertFileHeadersSame vals
                 , testCase "file content same" assertFileContenTheSame
-                -- , testCase "conduit uncompressed" (assertFileHeadersSame sinkEntryUncompressed)
-                -- -- , testCase "conduit parallel" (assertFileHeadersSame sinkEntryUncompressed)
-                -- , testCase "files      " (assertFiles Nothing)
-                -- , testCase "files-as   " (assertFiles $ Just ("contents" </>))
 
                 , testCase "see if it can handle empty string" readCentralDir
                 , testCase "see if file header can read" readFileHeader
@@ -119,10 +118,33 @@ readFileHeader :: IO ()
 readFileHeader =
   assertEqual "file header same" (Left "too few bytes\nFrom:\tdemandInput\n\n") (runGet getFileHeader mempty)
 
+instance Arbitrary FileInZipOptions  where
+  arbitrary = do
+    fizCompression  <- arbitrary
+    fizModification <- arbitrary
+    fizBitflag      <- arbitrary
+    fizExtraField   <- arbitrary
+    fizComment      <- arbitrary
+    pure $ MkFileInZipOptions {..}
+
+instance Monad m => Arbitrary (FileContent m) where
+  arbitrary = do
+    fcFileHeader <- arbitrary
+    bs <- arbitrary
+    let fcFileContents = yield bs
+    pure $ MkFileContent {..}
+
+newtype Entries = MkEntries [(FilePath, FileContent (ResourceT IO))]
+  deriving Show
+instance Arbitrary Entries where
+  arbitrary =
+    MkEntries <$> listOf arbitrary
+
+
 -- TODO covnert into property tests
-assertFileHeadersSame :: IO ()
-assertFileHeadersSame = do
-    withSystemTempDirectory "zip-conduit" $ \dir -> do
+assertFileHeadersSame :: Entries -> PropertyM IO ()
+assertFileHeadersSame (MkEntries entriesInfo) = do
+    liftIO $ withSystemTempDirectory "zip-conduit" $ \dir -> do
         let archivePath = dir </> archiveName
         _ <- writeZipFile archivePath $ Map.fromList entriesInfo
         result' <- readZipFile @(ResourceT IO) archivePath
@@ -134,11 +156,6 @@ assertFileHeadersSame = do
                                             ((over (mapped . _2) fcFileHeader $ Map.toList result))
   where
     archiveName = "test.zip"
-    entriesInfo :: [(FilePath, FileContent (ResourceT IO))]
-    entriesInfo = [ ("test1.txt", appendBytestring "some test text" defOptions)
-                  , ("test2.txt", appendBytestring "some another test text" defOptions)
-                  , ("test3.txt", appendBytestring "one more" defOptions)
-                  ]
 
 assertFileContenTheSame :: IO ()
 assertFileContenTheSame = do
