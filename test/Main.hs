@@ -37,6 +37,7 @@ tests =
                 [
                   testCase "file headers same" assertFileHeadersSame
                 , testCase "file content same" assertFileContenTheSame
+                , testCase "reads golden somezip" assertsReadsGoldenSomeZip
                 -- , testCase "conduit uncompressed" (assertFileHeadersSame sinkEntryUncompressed)
                 -- -- , testCase "conduit parallel" (assertFileHeadersSame sinkEntryUncompressed)
                 -- , testCase "files      " (assertFiles Nothing)
@@ -50,7 +51,19 @@ tests =
                 , QC.testProperty "dataDescriptorRoundTrip" dataDescriptorRoundTrip
                 ]
 
--- TODO property tests for all get/puts
+assertsReadsGoldenSomeZip :: IO ()
+assertsReadsGoldenSomeZip = do
+      result' <- readZipFile @(ResourceT IO) "test/somezip.zip"
+      case result' of
+          Left errors ->
+            throwIO errors
+          Right result -> do
+            assertEqual "list diff is same" ["somezip/", "somezip/filex", "somezip/filey", "somezip/filez"]
+                                            (fst <$> Map.toList result)
+
+            results <- forM (Map.toList result) $ \(_, econtent) -> runConduitRes $ fcFileContents econtent .| C.fold
+            assertEqual "contents same" ["", "xxx\n", "yyyyyy\n", "zzzzzzzzzzzz\n"]
+                                        results
 
 instance Arbitrary End where
   arbitrary = End <$> arbitrary <*> arbitrary <*> arbitrary <*> (encodeUtf8 <$> arbitrary)

@@ -18,7 +18,7 @@ input file/bytestring.
 
 TODO:
 
-+ [ ] get a working implementation
++ [x] get a working implementation
 + [ ] See if can get tests from other libraries
 + [ ] See if can get benchmarks
 
