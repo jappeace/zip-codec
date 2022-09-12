@@ -51,6 +51,7 @@ tests =
                 , QC.testProperty "dataDescriptorRoundTrip" dataDescriptorRoundTrip
                 ]
 
+-- this tests if we can decode a zip file made by another program
 assertsReadsGoldenSomeZip :: IO ()
 assertsReadsGoldenSomeZip = do
       result' <- readZipFile @(ResourceT IO) "test/somezip.zip"
