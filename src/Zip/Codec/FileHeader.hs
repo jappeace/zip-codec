@@ -60,6 +60,8 @@ data FileHeader = FileHeader
     , fhInternalFileAttributes :: Word16
     , fhExternalFileAttributes :: Word32
     , fhRelativeOffset         :: Word32
+    -- | note that the central directory map overwrites this atribute,
+    --   but we need it for reading
     , fhFileName               :: FilePath
     , fhExtraField             :: ByteString
     , fhFileComment            :: Text

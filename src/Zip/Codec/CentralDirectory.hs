@@ -33,7 +33,7 @@ import Data.Bifunctor
 -- [file header n]
 --
 -- we represent it as a map internally.
-data CentralDirectory = CentralDirectory
+newtype CentralDirectory = CentralDirectory
     -- a hashmap maybe faster but it opens up a DoS vulnrability
     -- due to fnv being vulnrable to universal collisions.
     { cdFileHeaders      :: Map FilePath FileHeader -- this representation will filter out double files for better or worse.
@@ -78,4 +78,6 @@ writeCentralDirectory h cd =
 
 putCentralDirectory :: CentralDirectory -> Put
 putCentralDirectory cd =
-    mapM_ putFileHeader $ cdFileHeaders cd
+    mapM_ putFileHeader $
+      mapWithKey (\key val -> val{ fhFileName = key} ) $
+      cdFileHeaders cd

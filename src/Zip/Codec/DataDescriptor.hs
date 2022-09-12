@@ -12,10 +12,10 @@ module Zip.Codec.DataDescriptor
   )
 where
 
-import           System.IO
-import Data.Word
-import           Data.Serialize
 import qualified Data.ByteString as B
+import           Data.Serialize
+import           Data.Word
+import           System.IO
 
 -- | Data descriptor
 --

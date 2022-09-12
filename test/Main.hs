@@ -46,6 +46,7 @@ tests =
                 , testCase "see if file header can read" readFileHeader
                 , QC.testProperty "endRoundTrip" endRoundTrip
                 , QC.testProperty "fileHeaderRoundTrip" fileHeaderRoundTrip
+                , QC.testProperty "centralDirectoryRoundTrip" centralDirectoryRoundTrip
                 , QC.testProperty "dataDescriptorRoundTrip" dataDescriptorRoundTrip
                 ]
 
@@ -95,6 +96,19 @@ fileHeaderRoundTrip fileHeader =
   let out = runGet getFileHeader (runPut (putFileHeader fileHeader))
   in
   counterexample ("got this output: \n " <> show out) $ out == Right (Right fileHeader)
+
+instance Arbitrary CentralDirectory where
+  arbitrary = CentralDirectory .
+    Map.mapWithKey (\key val -> val{ fhFileName = key} )
+    <$>
+    arbitrary
+
+centralDirectoryRoundTrip :: CentralDirectory -> Property
+centralDirectoryRoundTrip centralDirectory =
+  let out = runGet getCentralDirectory (runPut (putCentralDirectory centralDirectory))
+  in
+  counterexample ("got this output: \n " <> show out) $ out == Right (Right centralDirectory)
+
 
 -- this caused segaults in ghc runtime before, see https://github.com/GaloisInc/cereal/issues/105
 readCentralDir :: IO ()
