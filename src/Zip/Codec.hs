@@ -50,9 +50,6 @@ data FileContent m = MkFileContent
   , fcFileContents :: ConduitT () ByteString m ()
   }
 
-instance Show (FileContent m) where
-  show x =  "MkFileContent { fcFileHeader =" <> show (fcFileHeader x) <> ", ..}"
-
 -- | this opens up a file from the filesystem
 --   it provides a map of internal file with a conduit to the data
 readZipFile :: (MonadThrow m, PrimMonad m, MonadResource m) => FilePath -> IO (Either CodecErrors (Map FilePath (FileContent m)))
