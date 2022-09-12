@@ -1,8 +1,11 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Main where
 
+import Zip.Codec.Time
 import Zip.Codec.End
 import Data.Text.Encoding(encodeUtf8)
 import Control.Monad
@@ -41,6 +44,7 @@ tests =
                 , testCase "see if it can handle empty string" readCentralDir
                 , testCase "see if file header can read" readFileHeader
                 , QC.testProperty "endRoundTrip" endRoundTrip
+                , QC.testProperty "fileHeaderRoundTrip" fileHeaderRoundTrip
                 ]
 
 -- TODO property tests for all get/puts
@@ -53,6 +57,35 @@ endRoundTrip end =
   let out = runGet getEnd (runPut (putEnd end))
   in
   counterexample ("got this output: \n " <> show out) $ out == Right end
+
+instance Arbitrary CompressionMethod where
+  arbitrary = QC.elements [minBound..maxBound]
+
+instance Arbitrary MSDOSDateTime where
+  arbitrary = MSDOSDateTime <$> arbitrary <*> arbitrary
+
+instance Arbitrary FileHeader where
+  arbitrary = do
+    fhBitFlag                 <- arbitrary
+    fhCompressionMethod       <- arbitrary
+    fhLastModified            <- arbitrary
+    fhCRC32                   <- arbitrary
+    fhCompressedSize          <- arbitrary
+    fhUncompressedSize        <- arbitrary
+    fhInternalFileAttributes  <- arbitrary
+    fhExternalFileAttributes  <- arbitrary
+    fhRelativeOffset          <- arbitrary
+    fhFileName                <- arbitrary
+    fhExtraField              <- arbitrary
+    fhFileComment             <- arbitrary
+    pure $ FileHeader {..}
+
+fileHeaderRoundTrip :: FileHeader -> Property
+fileHeaderRoundTrip fileHeader =
+  let out = runGet getFileHeader (runPut (putFileHeader fileHeader))
+  in
+  counterexample ("got this output: \n " <> show out) $ out == Right (Right fileHeader)
+
 
 
 -- this caused segaults in ghc runtime before, see https://github.com/GaloisInc/cereal/issues/105

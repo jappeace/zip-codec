@@ -69,7 +69,7 @@ data FileHeader = FileHeader
 
 data CompressionMethod = NoCompression
                        | Deflate
-                         deriving (Show, Eq)
+                         deriving (Show, Eq, Bounded, Enum)
 
 data GetFileHeaderError = DecodeFileNameFailed { original :: ByteString, exception :: UnicodeException}
                         | DecodeCommentFailed { original :: ByteString, exception :: UnicodeException}
@@ -171,6 +171,11 @@ putLocalFileHeader :: FileHeader -> Put
 putLocalFileHeader fh = do
     putWord32le 0x04034b50
     putWord16le 20  -- version needed to extract (>= 2.0)
+    putFileHeaderMeta fh
+    putFileHeaderNameExtra fh
+
+putFileHeaderMeta :: FileHeader -> Put
+putFileHeaderMeta fh = do
     putWord16le $ fhBitFlag fh
     putWord16le compressionMethod
     putWord16le $ msDOSTime modTime
@@ -180,41 +185,30 @@ putLocalFileHeader fh = do
     putWord32le $ fhUncompressedSize fh
     putWord16le $ fromIntegral $ B.length $ encodeUtf8 $ T.pack $ fhFileName fh
     putWord16le $ fromIntegral $ B.length $ fhExtraField fh
-    putByteString $ encodeUtf8 $ T.pack $ fhFileName fh
-    putByteString $ fhExtraField fh
   where
     modTime = fhLastModified fh
     compressionMethod = case fhCompressionMethod fh of
                           NoCompression -> 0
                           Deflate       -> 8
 
+putFileHeaderNameExtra :: FileHeader -> Put
+putFileHeaderNameExtra fh = do
+    putByteString $ encodeUtf8 $ T.pack $ fhFileName fh
+    putByteString $ fhExtraField fh
+
 putFileHeader :: FileHeader -> Put
 putFileHeader fh = do
     putWord32le 0x02014b50
     putWord16le 0   -- version made by
     putWord16le 20  -- version needed to extract (>= 2.0)
-    putWord16le $ fhBitFlag fh
-    putWord16le compressionMethod
-    putWord16le $ msDOSTime modTime
-    putWord16le $ msDOSDate modTime
-    putWord32le $ fhCRC32 fh
-    putWord32le $ fhCompressedSize fh
-    putWord32le $ fhUncompressedSize fh
-    putWord16le $ fromIntegral $ B.length $ encodeUtf8 $ T.pack $ fhFileName fh
-    putWord16le $ fromIntegral $ B.length $ fhExtraField fh
+    putFileHeaderMeta fh
     putWord16le $ fromIntegral $ B.length $ encodeUtf8 $ fhFileComment fh
     putWord16le 0  -- disk number start
     putWord16le $ fhInternalFileAttributes fh
     putWord32le $ fhExternalFileAttributes fh
     putWord32le $ fhRelativeOffset fh
-    putByteString $ encodeUtf8 $ T.pack $ fhFileName fh
-    putByteString $ fhExtraField fh
+    putFileHeaderNameExtra fh
     putByteString $ encodeUtf8 $ fhFileComment fh
-  where
-    modTime = fhLastModified fh
-    compressionMethod = case fhCompressionMethod fh of
-                          NoCompression -> 0
-                          Deflate       -> 8
 
 localFileHeaderLength :: FileHeader -> Word32
 localFileHeaderLength fh =
