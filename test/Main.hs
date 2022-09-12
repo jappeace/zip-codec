@@ -5,6 +5,7 @@
 
 module Main where
 
+import Zip.Codec.DataDescriptor
 import Zip.Codec.Time
 import Zip.Codec.End
 import Data.Text.Encoding(encodeUtf8)
@@ -45,6 +46,7 @@ tests =
                 , testCase "see if file header can read" readFileHeader
                 , QC.testProperty "endRoundTrip" endRoundTrip
                 , QC.testProperty "fileHeaderRoundTrip" fileHeaderRoundTrip
+                , QC.testProperty "dataDescriptorRoundTrip" dataDescriptorRoundTrip
                 ]
 
 -- TODO property tests for all get/puts
@@ -58,20 +60,28 @@ endRoundTrip end =
   in
   counterexample ("got this output: \n " <> show out) $ out == Right end
 
+instance Arbitrary DataDescriptor where
+  arbitrary = DataDescriptor <$> arbitrary <*> arbitrary <*> arbitrary
+
+dataDescriptorRoundTrip :: DataDescriptor -> Property
+dataDescriptorRoundTrip dataDescriptor =
+  let out = runGet getDataDescriptor (runPut (putDataDescriptor dataDescriptor))
+  in
+  counterexample ("got this output: \n " <> show out) $ out == Right dataDescriptor
+
 instance Arbitrary CompressionMethod where
   arbitrary = QC.elements [minBound..maxBound]
 
 instance Arbitrary MSDOSDateTime where
   arbitrary = MSDOSDateTime <$> arbitrary <*> arbitrary
 
+
 instance Arbitrary FileHeader where
   arbitrary = do
     fhBitFlag                 <- arbitrary
     fhCompressionMethod       <- arbitrary
     fhLastModified            <- arbitrary
-    fhCRC32                   <- arbitrary
-    fhCompressedSize          <- arbitrary
-    fhUncompressedSize        <- arbitrary
+    fhDataDescriptor          <- arbitrary
     fhInternalFileAttributes  <- arbitrary
     fhExternalFileAttributes  <- arbitrary
     fhRelativeOffset          <- arbitrary
@@ -85,8 +95,6 @@ fileHeaderRoundTrip fileHeader =
   let out = runGet getFileHeader (runPut (putFileHeader fileHeader))
   in
   counterexample ("got this output: \n " <> show out) $ out == Right (Right fileHeader)
-
-
 
 -- this caused segaults in ghc runtime before, see https://github.com/GaloisInc/cereal/issues/105
 readCentralDir :: IO ()

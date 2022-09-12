@@ -64,9 +64,7 @@ updateEnd dd fh end = end {
   }
 
 updateFileHeader :: DataDescriptor -> FileHeader -> FileHeader
-updateFileHeader dd fh = fh { fhCRC32            = ddCRC32 dd
-                            , fhCompressedSize   = ddCompressedSize dd
-                            , fhUncompressedSize = ddUncompressedSize dd
+updateFileHeader dd fh = fh { fhDataDescriptor = dd
                             }
 
 -- TODO append files
@@ -92,9 +90,7 @@ mkFileHeader filePath options relativeOffset =
     FileHeader { fhBitFlag                = fizBitflag options
                , fhCompressionMethod      = fizCompression options
                , fhLastModified           = utcTimeToMSDOSDateTime $ fizModification options
-               , fhCRC32                  = 0
-               , fhCompressedSize         = 0
-               , fhUncompressedSize       = 0
+               , fhDataDescriptor         = emptyDataDescriptor
                , fhInternalFileAttributes = 0
                , fhExternalFileAttributes = 0
                , fhRelativeOffset         = relativeOffset

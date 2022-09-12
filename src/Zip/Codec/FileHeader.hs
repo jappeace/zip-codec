@@ -14,6 +14,7 @@ module Zip.Codec.FileHeader
   )
 where
 
+import Zip.Codec.DataDescriptor
 import Data.Text(Text)
 import           System.IO (Handle, SeekMode(..), hSeek)
 import Data.Serialize.Get
@@ -55,9 +56,7 @@ data FileHeader = FileHeader
     { fhBitFlag                :: Word16
     , fhCompressionMethod      :: CompressionMethod
     , fhLastModified           :: MSDOSDateTime
-    , fhCRC32                  :: Word32
-    , fhCompressedSize         :: Word32
-    , fhUncompressedSize       :: Word32
+    , fhDataDescriptor         :: DataDescriptor
     , fhInternalFileAttributes :: Word16
     , fhExternalFileAttributes :: Word32
     , fhRelativeOffset         :: Word32
@@ -91,9 +90,7 @@ getFileHeader = do
                                           ++ show rawCompressionMethod
     lastModFileTime        <- getWord16le
     lastModFileDate        <- getWord16le
-    crc32                  <- getWord32le
-    compressedSize         <- getWord32le
-    uncompressedSize       <- getWord32le
+    dataDescriptor         <- getDataDescriptor
     fileNameLength         <- fromIntegral <$> getWord16le
     extraFieldLength       <- fromIntegral <$> getWord16le
     fileCommentLength      <- fromIntegral <$> getWord16le
@@ -111,9 +108,7 @@ getFileHeader = do
                { fhBitFlag                = bitFlag
                , fhCompressionMethod      = compessionMethod
                , fhLastModified           = MSDOSDateTime { msDOSDate = lastModFileDate, msDOSTime = lastModFileTime}
-               , fhCRC32                  = crc32
-               , fhCompressedSize         = compressedSize
-               , fhUncompressedSize       = uncompressedSize
+               , fhDataDescriptor         = dataDescriptor
                , fhInternalFileAttributes = internalFileAttributes
                , fhExternalFileAttributes = externalFileAttributes
                , fhRelativeOffset         = relativeOffset
@@ -180,9 +175,7 @@ putFileHeaderMeta fh = do
     putWord16le compressionMethod
     putWord16le $ msDOSTime modTime
     putWord16le $ msDOSDate modTime
-    putWord32le $ fhCRC32 fh
-    putWord32le $ fhCompressedSize fh
-    putWord32le $ fhUncompressedSize fh
+    putDataDescriptor $ fhDataDescriptor fh
     putWord16le $ fromIntegral $ B.length $ encodeUtf8 $ T.pack $ fhFileName fh
     putWord16le $ fromIntegral $ B.length $ fhExtraField fh
   where

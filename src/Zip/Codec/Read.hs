@@ -9,6 +9,7 @@ module Zip.Codec.Read
   )
 where
 
+import           Zip.Codec.DataDescriptor
 import           Control.Exception
 import           Control.Monad.Catch
 import           Control.Monad.Primitive
@@ -29,7 +30,7 @@ data SourceFileError = OffsetError String
 
 sourceFile :: (MonadThrow m, PrimMonad m, MonadResource m) => FilePath -> FileHeader -> ConduitT () ByteString m ()
 sourceFile zipPath fileHeader =
-    source .| CB.isolate (fromIntegral $ fhCompressedSize fileHeader)
+    source .| CB.isolate (fromIntegral $ ddCompressedSize $ fhDataDescriptor fileHeader)
            .| decomp
   where
     source = CB.sourceIOHandle $ do

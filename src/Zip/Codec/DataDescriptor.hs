@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 
 -- | This is used to indicate the shape of a file,
 --   it includes a checksum, compressed and uncompressed sizes.
@@ -6,6 +7,8 @@ module Zip.Codec.DataDescriptor
   , writeDataDescriptorFields
   , writeDataDescriptor
   , putDataDescriptor
+  , getDataDescriptor
+  , emptyDataDescriptor
   )
 where
 
@@ -25,13 +28,25 @@ data DataDescriptor = DataDescriptor
     { ddCRC32            :: Word32
     , ddCompressedSize   :: Word32
     , ddUncompressedSize :: Word32
-    } deriving (Show)
+    } deriving (Show, Eq)
 
+emptyDataDescriptor :: DataDescriptor
+emptyDataDescriptor = DataDescriptor
+    { ddCRC32            = 0
+    , ddCompressedSize   = 0
+    , ddUncompressedSize = 0
+    }
 
 writeDataDescriptor :: Handle -> DataDescriptor -> IO ()
 writeDataDescriptor h dd =
     B.hPut h $ runPut $ putDataDescriptor dd
 
+getDataDescriptor :: Get DataDescriptor
+getDataDescriptor = do
+    ddCRC32            <- getWord32le
+    ddCompressedSize   <- getWord32le
+    ddUncompressedSize <- getWord32le
+    pure $ DataDescriptor {..}
 
 putDataDescriptor :: DataDescriptor -> Put
 putDataDescriptor dd = do
