@@ -9,6 +9,7 @@ module Zip.Codec
     CodecErrors(..)
   , readZipFile
   , FileContent(..)
+  , readFileIntoContent
     -- * writing
   , writeZipFile
   , defOptions
@@ -22,7 +23,8 @@ import qualified Data.Map as Map
 import Control.Monad.Trans.Class
 import Data.Traversable
 import Control.Monad.Trans.State.Lazy
-import Data.Conduit(runConduitRes)
+import Data.Conduit(runConduitRes, ConduitT, (.|), yield)
+import qualified Data.Conduit.Combinators as CC
 import Control.Exception
 import Zip.Codec.End
 import Zip.Codec.FileHeader
@@ -32,7 +34,6 @@ import           Data.Time (UTCTime(..))
 import           System.IO (IOMode(..), withFile)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Trans.Resource
-import           Data.Conduit (ConduitT, (.|), yield)
 import Data.Map(Map)
 import Zip.Codec.CentralDirectory
 import Control.Monad.Trans.Except
@@ -68,17 +69,28 @@ readZipFile zipPath =
 appendBytestring :: Monad m => ByteString -> FileContent m -> FileContent m
 appendBytestring bs opts = opts{ fcFileContents = fcFileContents opts <> yield bs }
 
+-- | read a file from the file system into a filecontent
+readFileIntoContent :: FilePath -> FileContent (ResourceT IO)
+readFileIntoContent filepath = x
+                                { fcFileContents = CC.sourceFile filepath }
+                                where
+                                  x :: FileContent (ResourceT IO)
+                                  x = defOptions
+
 -- shouldn't this return a map of sinks instead?
 -- I'm not sure how finilzation works then
-writeZipFile :: FilePath -> Map FilePath (FileContent (ResourceT IO)) -> IO (CentralDirectory, End)
+writeZipFile ::
+  -- | Path to the zipfile to be written
+  FilePath ->
+  -- | A map with as key the filename of the zipfile and value the content desscription of a file.
+  Map FilePath (FileContent (ResourceT IO)) ->
+  IO (CentralDirectory, End)
 writeZipFile zipPath filesMap = do
 
   nya <- flip execStateT (emptyCentralDirectory, emptyEnd) $
-        forM files $ \(filePath, fileContents) -> do
-           (centralDir, end) <- get
-           res <- lift $ runConduitRes $
-             fcFileContents fileContents .|
-             sinkFile centralDir end zipPath filePath (fcFileHeader fileContents)
+        forM files $ \curFile -> do
+           state' <- get
+           res <- lift $ writeFileContent zipPath state' curFile
            put res
   pure nya
 
@@ -86,6 +98,22 @@ writeZipFile zipPath filesMap = do
     files :: [(FilePath, FileContent (ResourceT IO))]
     files = Map.toList filesMap
 
+-- | Write a single file content to a zipfile.
+writeFileContent ::
+  -- | the path to the zipfile to be written
+  FilePath ->
+  -- | previous central directory and end
+  (CentralDirectory, End) ->
+  -- | the file to be written within a zipfile
+  (FilePath, FileContent (ResourceT IO)) ->
+  -- | new central directory and end
+  IO (CentralDirectory, End)
+writeFileContent zipPath (centralDir, end) (filePath, fileContents) =
+  runConduitRes $
+             fcFileContents fileContents .|
+             sinkFile centralDir end zipPath filePath (fcFileHeader fileContents)
+
+-- | empty file content
 defOptions :: Monad m => FileContent m
 defOptions = MkFileContent
     { fcFileHeader = MkFileInZipOptions

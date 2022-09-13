@@ -88,3 +88,19 @@ tests:
     - temporary
     - lens
     - quickcheck-instances
+
+executables:
+  bench:
+    source-dirs:    bench
+    main:           Bench.hs
+    dependencies:
+      - directory      
+      - criterion      
+      - filepath       
+      - LibZip         
+      - random         
+      - temporary      
+      - zip-archive    
+      - zip-codec
+      - zip
+      - zip-stream

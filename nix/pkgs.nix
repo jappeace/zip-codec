@@ -3,8 +3,13 @@ import ./pin.nix {
 
     packageOverrides = pkgs: {
         haskell = pkgs.lib.recursiveUpdate pkgs.haskell {
-        packageOverrides = hpNew: hpOld: {
+          packageOverrides = hpNew: hpOld:
+            let
+              lib = pkgs.haskell.lib;
+            in
+            {
             zip-codec = hpNew.callPackage ../default.nix {};
+
             };
         };
     };

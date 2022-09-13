@@ -17,4 +17,6 @@ in
 pkgs.haskell.lib.overrideCabal cabal2nix (drv: {
   inherit src;
   isExecutable = true;
+  # doBenchmark = true;
+
 })
