@@ -2,9 +2,15 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Main where
 
+import qualified Data.ByteString.Lazy as B
+import           Data.Word (Word8)
+import           System.IO (IOMode(..), withFile)
+import           System.Random (getStdGen, randoms)
+import qualified Control.Concurrent.Async as Async
 import Zip.Codec.DataDescriptor
 import Zip.Codec.Time
 import Zip.Codec.End
@@ -27,6 +33,7 @@ import Control.Lens
 import Zip.Codec.FileHeader
 import Test.Tasty.QuickCheck as QC
 import Test.QuickCheck.Instances()
+import qualified Data.Map.Merge.Lazy as Map
 
 main :: IO ()
 main = defaultMain tests
@@ -37,6 +44,7 @@ tests =
                 [
                   testCase "file headers same" assertFileHeadersSame
                 , testCase "file content same" assertFileContenTheSame
+                , testCase "file content same async" assertFileContenTheSameAsync
                 , testCase "reads golden somezip" assertsReadsGoldenSomeZip
                 -- , testCase "conduit uncompressed" (assertFileHeadersSame sinkEntryUncompressed)
                 -- -- , testCase "conduit parallel" (assertFileHeadersSame sinkEntryUncompressed)
@@ -155,9 +163,22 @@ assertFileHeadersSame = do
                   ]
 
 assertFileContenTheSame :: IO ()
-assertFileContenTheSame = do
+assertFileContenTheSame = assertFileContenTheSameGeneral forM
+
+assertFileContenTheSameAsync :: IO ()
+assertFileContenTheSameAsync = assertFileContenTheSameGeneral Async.forConcurrently
+
+assertFileContenTheSameGeneral :: (forall t a b. Traversable t => t a -> (a -> IO b) -> IO (t b))  -> IO ()
+assertFileContenTheSameGeneral forFun = do
     withSystemTempDirectory "zip-conduit" $ \dir -> do
-        let archivePath = dir </> archiveName
+        let entriesInfo = entriesInfoFun dir
+            entriesInfoMap = Map.fromList entriesInfo
+            archivePath = dir </> archiveName
+        createFile (dir </> "bigly1.file") $ 1024 * 1024 * 1
+        createFile (dir </> "bigly2.file") $ 1024 * 1024 * 1
+        createFile (dir </> "bigly3.file") $ 1024 * 1024 * 2
+        createFile (dir </> "bigly4.file") $ 1024 * 1024 * 1
+        createFile (dir </> "bigly5.file") $ 1024 * 1024 * 3
         _ <- writeZipFile archivePath $ Map.fromList entriesInfo
         result' <- readZipFile @(ResourceT IO) archivePath
         case result' of
@@ -165,14 +186,29 @@ assertFileContenTheSame = do
             throwIO errors
           Right result -> do
             assertEqual "length same" (length entriesInfo) (length result)
-            void $ forM (zip entriesInfo (Map.toList result)) $ \((efileName, econtent), (_rfileName, fcontent)) -> do
+            let merged = Map.merge Map.dropMissing Map.dropMissing (Map.zipWithMatched (\k -> (k,,)))
+                                entriesInfoMap result
+
+
+            void $ forFun merged $ \(fileName, econtent, fcontent) -> do
                 expected  <- runConduitRes $ fcFileContents econtent .| C.fold
                 resulted <- runConduitRes $ fcFileContents fcontent .| C.fold
-                assertEqual ("same content" <> efileName) expected resulted
+                assertEqual ("same content" <> fileName) expected resulted
   where
     archiveName = "test.zip"
-    entriesInfo :: [(FilePath, FileContent (ResourceT IO))]
-    entriesInfo = [ ("test1.txt", appendBytestring "some test text" defOptions)
+    entriesInfoFun :: FilePath -> [(FilePath, FileContent (ResourceT IO))]
+    entriesInfoFun dir = [ ("test1.txt", appendBytestring "some test text" defOptions)
                   , ("test2.txt", appendBytestring "some another test text" defOptions)
                   , ("test3.txt", appendBytestring "one more" defOptions)
+                  , ("bigly", readFileContent (dir </> "bigly1.file" ))
+                  , ("bigly2", readFileContent (dir </> "bigly2.file" ))
+                  , ("bigly3", readFileContent (dir </> "bigly3.file" ))
+                  , ("bigly4", readFileContent (dir </> "bigly4.file" ))
+                  , ("bigly5", readFileContent (dir </> "bigly5.file" ))
                   ]
+
+createFile :: FilePath -> Int -> IO ()
+createFile path size =
+    withFile path WriteMode $ \h -> do
+        g <- getStdGen
+        B.hPut h $ B.pack $ take size (randoms g :: [Word8])
