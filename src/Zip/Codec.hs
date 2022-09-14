@@ -9,7 +9,8 @@ module Zip.Codec
     CodecErrors(..)
   , readZipFile
   , FileContent(..)
-  , readFileIntoContent
+  , readFileContent
+  , readFileContentMap
     -- * writing
   , writeZipFile
   , defOptions
@@ -18,6 +19,7 @@ module Zip.Codec
   )
 where
 
+import Control.Monad(void)
 import Zip.Codec.Time
 import qualified Data.Map as Map
 import Control.Monad.Trans.Class
@@ -70,12 +72,16 @@ appendBytestring :: Monad m => ByteString -> FileContent m -> FileContent m
 appendBytestring bs opts = opts{ fcFileContents = fcFileContents opts <> yield bs }
 
 -- | read a file from the file system into a filecontent
-readFileIntoContent :: FilePath -> FileContent (ResourceT IO)
-readFileIntoContent filepath = x
+readFileContent :: FilePath -> FileContent (ResourceT IO)
+readFileContent filepath = x
                                 { fcFileContents = CC.sourceFile filepath }
                                 where
                                   x :: FileContent (ResourceT IO)
                                   x = defOptions
+
+-- | does 'readFileContent' and puts it into a singleton map under the same filename
+readFileContentMap :: FilePath -> Map FilePath (FileContent (ResourceT IO))
+readFileContentMap x = Map.singleton x $ readFileContent x
 
 -- shouldn't this return a map of sinks instead?
 -- I'm not sure how finilzation works then
@@ -84,15 +90,13 @@ writeZipFile ::
   FilePath ->
   -- | A map with as key the filename of the zipfile and value the content desscription of a file.
   Map FilePath (FileContent (ResourceT IO)) ->
-  IO (CentralDirectory, End)
-writeZipFile zipPath filesMap = do
-
-  nya <- flip execStateT (emptyCentralDirectory, emptyEnd) $
+  IO ()
+writeZipFile zipPath filesMap =
+  void $ flip execStateT (emptyCentralDirectory, emptyEnd) $
         forM files $ \curFile -> do
            state' <- get
            res <- lift $ writeFileContent zipPath state' curFile
            put res
-  pure nya
 
   where
     files :: [(FilePath, FileContent (ResourceT IO))]

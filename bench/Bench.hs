@@ -5,6 +5,7 @@ module Main where
 import qualified Data.Map as Map
 import           Control.Monad (forM_)
 import qualified Data.ByteString.Lazy as B (hPut, pack, readFile)
+import qualified Data.ByteString as BS
 import           Data.Word (Word8)
 import           System.FilePath ((</>), (<.>))
 import           System.IO (IOMode(..), hPutStr, withFile)
@@ -14,6 +15,9 @@ import           Criterion.Main (Benchmark, bench, bgroup, defaultMain, nfIO)
 import           System.IO.Temp (withSystemTempDirectory, withTempDirectory)
 import           System.Random (getStdGen, randoms)
 
+import Control.Exception
+import qualified Data.Conduit.Combinators as CC
+import Data.Conduit ((.|), runConduitRes)
 import qualified Codec.Archive.LibZip as L
 import qualified "zip-archive" Codec.Archive.Zip as A
 import qualified "zip" Codec.Archive.Zip as Zip
@@ -37,15 +41,17 @@ prepareBench :: FilePath     -- ^ the path to the directory with files
 prepareBench dir names =
     [ bgroup "archive"
              [
-               -- bgroup "zip-conduit" $ b zipConduit
-               bgroup "zip-archive" $ b zipArchive
-             , bgroup "libZip"      $ b libZip
+             --   bgroup "zip-archive" $ b zipArchive
+             -- , bgroup "libZip"      $ b libZip
+             -- , bgroup "codec"       $ b zipCodec
+             -- , bgroup "zip"         $ b zipZip
              ]
     , bgroup "unarchive"
              [
-               -- bgroup "zip-conduit" $ b unZipConduit
-              bgroup "zip-archive" $ b unZipArchive
-             -- , bgroup "libZip"      $ b unLibZip
+               bgroup "zip-archive" $ b unZipArchive
+             , bgroup "zip-codec"   $ b unZipCodec
+             , bgroup "zip-zip"     $ b unZipZip
+             -- , bgroup "libZip"      $ b unLibZip -- way slower
              ]
     ]
   where
@@ -61,7 +67,7 @@ prepareFiles dir sizes = forM_ sizes $ \s -> do
     let path = dir </> show s
 
     createFile path s
-    This.writeZipFile (path <.> "zip") $ Map.singleton "somename" $ This.readFileIntoContent path
+    This.writeZipFile (path <.> "zip") $ Map.singleton "somename" $ This.readFileContent path
 
 
 -- | Creates a file of specified length with random content.
@@ -74,12 +80,6 @@ createFile path size =
 
 ------------------------------------------------------------------------------
 -- Create zip archive with three different packages.
-
--- zipConduit :: FilePath -> FilePath -> IO ()
--- zipConduit dir name =
---     withTempDirectory dir "zip-conduit" $ \tmpDir ->
---         withArchive (tmpDir </> name <.> "zip") $ addFiles [dir </> name]
-
 
 zipArchive :: FilePath -> FilePath -> IO ()
 zipArchive dir name =
@@ -97,16 +97,21 @@ libZip dir name =
            L.addFile (dir </> name) zs
            return ()
 
+zipCodec :: FilePath -> FilePath -> IO ()
+zipCodec dir name = do
+    withTempDirectory dir "codec" $ \tmpDir ->
+      This.writeZipFile (tmpDir </> name <.> "zip") $
+        This.readFileContentMap (dir </> name)
+
+zipZip :: FilePath -> FilePath -> IO ()
+zipZip dir name = do
+    withTempDirectory dir "zip" $ \tmpDir ->
+      Zip.createArchive (tmpDir </> name <.> "zip") $ do
+        selector <- Zip.mkEntrySelector "x"
+        Zip.loadEntry Zip.Deflate selector (dir </> name)
 
 ------------------------------------------------------------------------------
 -- Exctract files from archive with three different packages.
-
--- unZipConduit :: FilePath -> FilePath -> IO ()
--- unZipConduit dir name = do
---     withArchive (dir </> name <.> "zip") $ do
---         names <- entryNames
---         extractFiles names $ dir -- </> "zip-conduit"
-
 
 unZipArchive :: FilePath -> FilePath -> IO ()
 unZipArchive dir name = do
@@ -119,6 +124,23 @@ unLibZip dir name = do
     bytes <- L.withArchive [] (dir </> name <.> "zip") $ L.fileContentsIx [] 0
     withFile (dir </> name) WriteMode $ \h ->
         hPutStr h bytes
+
+unZipCodec :: FilePath -> FilePath -> IO ()
+unZipCodec dir name = do
+    hashmapE <- This.readZipFile $ dir </> name <.> "zip"
+    case hashmapE of
+      Left x -> throwIO x
+      Right map' -> forM_ map' $ \fileContent ->
+        runConduitRes $ This.fcFileContents fileContent .| CC.sinkFile (dir </> name)
+
+unZipZip :: FilePath -> FilePath -> IO ()
+unZipZip dir name = do
+  entry <- Zip.withArchive (dir </> name <.> "zip") $ do
+    entries <- Zip.getEntries
+    -- using conduit is much faster then reading it all into memory and
+    -- then writing.
+    Zip.getEntrySource $ fst $ head (Map.toList entries)
+  runConduitRes $ entry.| CC.sinkFile (dir </> name)
 
 
 ------------------------------------------------------------------------------
