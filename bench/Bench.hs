@@ -3,6 +3,7 @@
 
 module Main where
 
+import Data.Functor.WithIndex
 import Data.Foldable(fold)
 import qualified Data.Map as Map
 import           Control.Monad (forM_, void)
@@ -68,6 +69,7 @@ multiples dir names = [bgroup "multiplefiles"
              , bench "zip"         $ nfIO $ unZipZipMultiple dir $ foldMap show names
              ]
   , bgroup "async-unarchive"
+  -- cretrion doesn't interfere apparantly with this https://www.reddit.com/r/haskell/comments/2m0pv6/force_criterion_to_benchmark_sequentially_for/
              [
                bench "codec"       $ nfIO $ unZipCodecMultipleAsync dir $ foldMap show names
              , bench "zip"         $ nfIO $ unZipZipMultipleAsync dir $ foldMap show names
@@ -221,8 +223,8 @@ unZipCodecMultipleGeneral forFun dir name = do
       Left x -> throwIO x
       Right map' -> do
         -- error $ show $ () <$ map'
-        void $ forFun map' $ \fileContent ->
-          runConduitRes $ This.fcFileContents fileContent .| CC.sinkFile (dir </> name)
+        void $ forFun (imap (\k v -> (k,v)) map') $ \(key, fileContent) ->
+          runConduitRes $ This.fcFileContents fileContent .| CC.sinkFile (dir </> key)
 
 deriving instance Show Zip.EntryDescription
 
