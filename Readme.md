@@ -22,10 +22,15 @@ TODO:
 + [x] See if can get tests from other libraries
   (I pobably can add more but better to focus on main value first which is
   parlalization/speed)
-+ [ ] See if can get benchmarks
++ [x] See if can get benchmarks
   looks like we need to add zip, and this package to zip-conduit to get 
   a complete overivew:
   https://github.com/tymmym/zip-conduit/blob/master/bench/Bench.hs
++ [ ] Add test for concurrent reading.
+      (apparantly the zip package does this right? see how they do it)
++ [ ] Add a concurrent writing implementation and test it.
++ [ ] figure out how to bench concurrent functions (I think by 
+      default criterion already spawns a bunch of threads).
 
 ## Alternatives
 
