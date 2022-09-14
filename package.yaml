@@ -106,3 +106,4 @@ executables:
       - zip
       - zip-stream
       - indexed-traversable
+      - async

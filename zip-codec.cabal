@@ -72,7 +72,6 @@ library
     , directory
     , exceptions
     , filepath
-    , indexed-traversable
     , mtl
     , old-time
     , primitive
@@ -111,6 +110,7 @@ executable bench
   ghc-options: -Wall -Wcompat -Wincomplete-uni-patterns -Wredundant-constraints -Wincomplete-record-updates -Widentities -Wcpp-undef -fwarn-tabs -Wpartial-fields -fdefer-diagnostics -Wunused-packages
   build-depends:
       LibZip
+    , async
     , base >=4.7 && <5
     , binary
     , bytestring
@@ -181,7 +181,6 @@ test-suite unit
     , directory
     , exceptions
     , filepath
-    , indexed-traversable
     , lens
     , mtl
     , old-time

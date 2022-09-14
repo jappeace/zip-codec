@@ -1,10 +1,12 @@
 {-# LANGUAGE PackageImports #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Main where
 
 import Data.Foldable(fold)
 import qualified Data.Map as Map
 import           Control.Monad (forM_, void)
+import Data.Traversable(forM)
 import qualified Data.ByteString.Lazy as B (hPut, pack, readFile)
 import           Data.Word (Word8)
 import           System.FilePath ((</>), (<.>))
@@ -25,6 +27,7 @@ import qualified "zip" Codec.Archive.Zip as Zip
 
 import qualified Zip.Codec as This
 import qualified Data.ByteUnits as Byte
+import qualified Control.Concurrent.Async as Async
 
 
 main :: IO ()
@@ -63,6 +66,11 @@ multiples dir names = [bgroup "multiplefiles"
              [
                bench "codec"       $ nfIO $ unZipCodecMultiple dir $ foldMap show names
              , bench "zip"         $ nfIO $ unZipZipMultiple dir $ foldMap show names
+             ]
+  , bgroup "async-unarchive"
+             [
+               bench "codec"       $ nfIO $ unZipCodecMultipleAsync dir $ foldMap show names
+             , bench "zip"         $ nfIO $ unZipZipMultipleAsync dir $ foldMap show names
              ]
   ]
   ]
@@ -200,30 +208,41 @@ unZipZip dir name = do
   runConduitRes $ entry.| CC.sinkFile (dir </> name)
 
 
+unZipCodecMultipleAsync :: FilePath -> FilePath -> IO ()
+unZipCodecMultipleAsync = unZipCodecMultipleGeneral (Async.forConcurrently)
+
 unZipCodecMultiple :: FilePath -> FilePath -> IO ()
-unZipCodecMultiple dir name = do
+unZipCodecMultiple = unZipCodecMultipleGeneral forM
+
+unZipCodecMultipleGeneral :: (forall t a b. Traversable t => t a -> (a -> IO b) -> IO (t b)) -> FilePath -> FilePath -> IO ()
+unZipCodecMultipleGeneral forFun dir name = do
     hashmapE <- This.readZipFile $ dir </> name <.> "zip"
     case hashmapE of
       Left x -> throwIO x
       Right map' -> do
         -- error $ show $ () <$ map'
-        forM_ map' $ \fileContent ->
+        void $ forFun map' $ \fileContent ->
           runConduitRes $ This.fcFileContents fileContent .| CC.sinkFile (dir </> name)
 
 deriving instance Show Zip.EntryDescription
 
+unZipZipMultipleAsync :: FilePath -> FilePath -> IO ()
+unZipZipMultipleAsync = unZipZipMultipleGeneral Async.mapConcurrently
+
 unZipZipMultiple :: FilePath -> FilePath -> IO ()
-unZipZipMultiple dir name = do
+unZipZipMultiple = unZipZipMultipleGeneral traverse
+
+unZipZipMultipleGeneral :: (forall t a b. Traversable t => (a -> IO b) -> t a -> IO (t b)) -> FilePath -> FilePath -> IO ()
+unZipZipMultipleGeneral traverseFun dir name = do
   entryMap <- Zip.withArchive (dir </> name <.> "zip") $ do
     entries <- Zip.getEntries
     -- using conduit is much faster then reading it all into memory and
     -- then writing.
-    itraverse (\key _ -> Zip.getEntrySource key) entries
+    itraverse (\key _ -> (key,) <$> Zip.getEntrySource key) entries
 
-  void $ itraverse (\key val ->
+  void $ traverseFun (\(key, val) ->
                 runConduitRes $ val .| CC.sinkFile (dir </> Zip.unEntrySelector key)
                ) entryMap
-
 
 ------------------------------------------------------------------------------
 -- Utils.
