@@ -31,6 +31,7 @@ library
       Zip.Codec.DataDescriptor
       Zip.Codec.End
       Zip.Codec.FileHeader
+      Zip.Codec.OSFile
       Zip.Codec.Read
       Zip.Codec.Time
       Zip.Codec.Write
