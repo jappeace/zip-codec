@@ -63,6 +63,7 @@ library
       base >=4.7 && <5
     , binary
     , bytestring
+    , byteunits
     , cereal
     , conduit
     , conduit-extra
@@ -71,6 +72,7 @@ library
     , directory
     , exceptions
     , filepath
+    , indexed-traversable
     , mtl
     , old-time
     , primitive
@@ -112,6 +114,7 @@ executable bench
     , base >=4.7 && <5
     , binary
     , bytestring
+    , byteunits
     , cereal
     , conduit
     , conduit-extra
@@ -121,6 +124,7 @@ executable bench
     , directory
     , exceptions
     , filepath
+    , indexed-traversable
     , mtl
     , old-time
     , primitive
@@ -168,6 +172,7 @@ test-suite unit
       base >=4.7 && <5
     , binary
     , bytestring
+    , byteunits
     , cereal
     , conduit
     , conduit-extra
@@ -176,6 +181,7 @@ test-suite unit
     , directory
     , exceptions
     , filepath
+    , indexed-traversable
     , lens
     , mtl
     , old-time

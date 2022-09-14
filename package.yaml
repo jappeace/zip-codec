@@ -71,6 +71,7 @@ dependencies:
 - primitive
 - exceptions
 - digest
+- byteunits
 
 library:
   source-dirs: src
@@ -104,3 +105,4 @@ executables:
       - zip-codec
       - zip
       - zip-stream
+      - indexed-traversable
