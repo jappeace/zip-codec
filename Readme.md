@@ -11,7 +11,7 @@ format.
 
 heavily inspired by [zip-conduit](https://hackage.haskell.org/package/zip-conduit),
 makes monads opt in. 
-Unlike zip which is completly baked around IO.
+Unlike zip which is completly baked around a custom monad.
 
 The ambition is to get parralel reading of a single
 input file/bytestring.
@@ -28,10 +28,11 @@ TODO:
   https://github.com/tymmym/zip-conduit/blob/master/bench/Bench.hs
 + [x] Add test for concurrent reading.
       (apparantly the zip package does this right? see how they do it)
-+ [ ] Add a concurrent writing implementation and test it.
 + [x] figure out how to bench concurrent functions (I think by 
       default criterion already spawns a bunch of threads).
 
++ [ ] Add a concurrent writing implementation and test it.
+  + [ ] Figure out how to track the central dir with that par writing method.
 ## Alternatives
 
 + [zip](https://hackage.haskell.org/package/zip):
