@@ -2,7 +2,7 @@
 module Zip.Codec.OSFile
   ( concatFilesCopyNew
   , concatFilesInPlace
-  , concatMany
+  , concatManyAsync
   )
 where
 
@@ -27,12 +27,15 @@ concatFilesInPlace :: FilePath -> FilePath -> IO ()
 concatFilesInPlace one two =
   runConduitRes $ CC.sourceFile two .| CC.sinkIOHandle (openFile one AppendMode)
 
-concatMany :: [FilePath] -> IO ()
-concatMany paths =
+-- | this will concat files asyncronusly and recursively
+--   resulting in a single file
+concatManyAsync :: [FilePath] -> IO FilePath
+concatManyAsync [] = pure "" -- wtf? crap goes in, crap goes out I suppose
+concatManyAsync paths =
   if length paths > 1 then do
   void $ Async.mapConcurrently (uncurry concatFilesInPlace) filtered
-  concatMany $ fst <$> filtered
-  else pure ()
+  concatManyAsync $ fst <$> filtered
+  else pure $ head paths
   where
     paired :: [((FilePath, FilePath), Int)]
     paired = zip (pairs paths) numbers
