@@ -43,6 +43,7 @@ import Data.Bifunctor
 import Control.Monad.Primitive
 import Zip.Codec.Read
 import Zip.Codec.Write
+import Zip.Codec.OSFile
 
 data CodecErrors = FailedEndReading String
                  | FailedCentralDirectoryReading CenteralDirErrors
