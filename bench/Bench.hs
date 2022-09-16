@@ -14,6 +14,7 @@ import           System.FilePath ((</>), (<.>))
 import           System.IO (IOMode(..), hPutStr, withFile)
 import           System.Directory (getCurrentDirectory, setCurrentDirectory)
 
+import Data.Time
 import           Criterion.Main (Benchmark, bench, bgroup, defaultMain, nfIO)
 import           System.IO.Temp (withSystemTempDirectory, withTempDirectory)
 import           System.Random (getStdGen, randoms)
@@ -21,14 +22,17 @@ import           System.Random (getStdGen, randoms)
 import Data.Traversable.WithIndex
 import Control.Exception
 import qualified Data.Conduit.Combinators as CC
-import Data.Conduit ((.|), runConduitRes)
+import Data.Conduit ((.|), runConduitRes, yield)
 import qualified Codec.Archive.LibZip as L
 import qualified "zip-archive" Codec.Archive.Zip as A
 import qualified "zip" Codec.Archive.Zip as Zip
+import qualified "zip-stream" Codec.Archive.Zip.Conduit.Zip as Stream
+import qualified "zip-stream" Codec.Archive.Zip.Conduit.UnZip as Stream
 
 import qualified Zip.Codec as This
 import qualified Data.ByteUnits as Byte
 import qualified Control.Concurrent.Async as Async
+import qualified Data.Text as Text
 
 
 main :: IO ()
@@ -51,7 +55,7 @@ main = do
         prepareFiles dir singleSizes
         prepareFiles dir multipleSizes
         defaultMain $
-          -- (singles dir singleSizes) <>
+          (singles dir singleSizes) <>
           multiples dir multipleSizes
 
 multiples :: FilePath
@@ -88,12 +92,14 @@ singles dir names = [bgroup "singlefiles"
              -- , bgroup "libZip"      $ b libZip
              , bgroup "codec"       $ makeBenchmark dir names zipCodec
              , bgroup "zip"         $ makeBenchmark dir names zipZip
+             , bgroup "zip-stream"  $ makeBenchmark dir names zipStream
              ]
     , bgroup "unarchive"
              [
                bgroup "zip-archive" $ makeBenchmark dir names unZipArchive
              , bgroup "zip-codec"   $ makeBenchmark dir names unZipCodec
              , bgroup "zip-zip"     $ makeBenchmark dir names unZipZip
+             , bgroup "zip-stream"  $ makeBenchmark dir names unZipStream
              -- , bgroup "libZip"      $ b unLibZip -- way slower
              ]
     ]]
@@ -163,6 +169,14 @@ zipZip dir name = do
         selector <- Zip.mkEntrySelector "x"
         Zip.loadEntry Zip.Deflate selector (dir </> name)
 
+zipStream :: FilePath -> FilePath -> IO ()
+zipStream dir name = do
+    withTempDirectory dir "zip" $ \tmpDir ->
+      runConduitRes $ yield (Stream.ZipEntry (Left (Text.pack name)) (LocalTime (toEnum 0) midnight) Nothing Nothing
+                          ,  Stream.zipFileData (dir </> name))
+                    .| void (Stream.zipStream Stream.defaultZipOptions)
+                    .| CC.sinkFile (tmpDir </> name <.> "zip")
+
 zipCodecMultiple :: FilePath -> [FilePath] -> IO ()
 zipCodecMultiple dir names = do
     withTempDirectory dir "codec" $ \tmpDir ->
@@ -209,6 +223,13 @@ unZipZip dir name = do
     Zip.getEntrySource $ fst $ head (Map.toList entries)
   runConduitRes $ entry.| CC.sinkFile (dir </> name)
 
+unZipStream :: FilePath -> FilePath -> IO ()
+unZipStream dir name =
+  runConduitRes $ CC.sourceFile (dir </> name <.> "zip") .| void Stream.unZipStream
+                                         .| CC.concatMap (\case
+                                                               Right bs -> Just bs
+                                                               Left _ -> Nothing)
+                                         .| CC.sinkFile (dir </> name)
 
 unZipCodecMultipleAsync :: FilePath -> FilePath -> IO ()
 unZipCodecMultipleAsync = unZipCodecMultipleGeneral (Async.forConcurrently)

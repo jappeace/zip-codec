@@ -72,6 +72,7 @@ dependencies:
 - exceptions
 - digest
 - byteunits
+- async
 
 library:
   source-dirs: src
@@ -106,4 +107,3 @@ executables:
       - zip
       - zip-stream
       - indexed-traversable
-      - async

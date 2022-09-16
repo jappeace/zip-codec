@@ -61,7 +61,8 @@ library
       TypeApplications
   ghc-options: -Wall -Wcompat -Wincomplete-uni-patterns -Wredundant-constraints -Wincomplete-record-updates -Widentities -Wcpp-undef -fwarn-tabs -Wpartial-fields -fdefer-diagnostics -Wunused-packages
   build-depends:
-      base >=4.7 && <5
+      async
+    , base >=4.7 && <5
     , binary
     , bytestring
     , byteunits
@@ -170,7 +171,8 @@ test-suite unit
       TypeApplications
   ghc-options: -Wall -Wcompat -Wincomplete-uni-patterns -Wredundant-constraints -Wincomplete-record-updates -Widentities -Wcpp-undef -fwarn-tabs -Wpartial-fields -fdefer-diagnostics -Wunused-packages
   build-depends:
-      base >=4.7 && <5
+      async
+    , base >=4.7 && <5
     , binary
     , bytestring
     , byteunits

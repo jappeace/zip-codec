@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# OPTIONS_GHC -w #-}
 
 -- | Functions for writing entire zip files
 module Zip.Codec.Write
