@@ -1,7 +1,6 @@
 -- | deal with OS files. eg on the file system
 module Zip.Codec.OSFile
-  ( concatFilesCopyNew
-  , concatFilesInPlace
+  ( concatFilesInPlace
   , concatManyAsync
   )
 where
@@ -13,14 +12,6 @@ import qualified Data.Conduit.Combinators as CC
 import System.IO
 import Data.Conduit
 
--- | creates a new file with the content of the first and second
-concatFilesCopyNew :: FilePath -> -- ^ output file
-  FilePath -> -- ^ input file one
-  FilePath -> -- ^ input file 2
-  IO ()
-concatFilesCopyNew output one two = do
-  copyFile one output
-  runConduitRes $ CC.sourceFile two .| CC.sinkIOHandle (openFile output AppendMode)
 
 -- | append the second file to the first file
 concatFilesInPlace :: FilePath -> FilePath -> IO ()
