@@ -44,7 +44,7 @@ emptyCentralDirectory = CentralDirectory mempty
 
 data CenteralDirErrors = MkGetErrors String
                        | FileDecodeErrors GetFileHeaderError
-                       deriving Show
+                       deriving (Show, Eq)
 
 readCentralDirectory :: Handle -> End -> IO (Either CenteralDirErrors CentralDirectory)
 readCentralDirectory h e = do

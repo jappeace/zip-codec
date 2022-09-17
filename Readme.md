@@ -33,6 +33,9 @@ TODO:
 
 + [ ] Add a concurrent writing implementation and test it.
   + [ ] Figure out how to track the central dir with that par writing method.
+
++ [ ] 64bit support (lol)
+
 ## Alternatives
 
 + [zip](https://hackage.haskell.org/package/zip):

@@ -12,6 +12,8 @@ module Zip.Codec
   , FileContent(..)
   , readFileContent
   , readFileContentMap
+    -- ** expert usage
+  , readEndAndCentralDir
     -- * writing
   , writeZipFile
   , defOptions
@@ -48,7 +50,7 @@ import Zip.Codec.OSFile
 
 data CodecErrors = FailedEndReading String
                  | FailedCentralDirectoryReading CenteralDirErrors
-                 deriving (Show, Exception)
+                 deriving (Show, Exception, Eq)
 
 data FileContent m = MkFileContent
   { fcFileHeader :: FileInZipOptions -- ^ simplified representation of FileHeader
@@ -58,16 +60,21 @@ data FileContent m = MkFileContent
 -- | this opens up a file from the filesystem
 --   it provides a map of internal file with a conduit to the data
 readZipFile :: (MonadThrow m, PrimMonad m, MonadResource m) => FilePath -> IO (Either CodecErrors (Map FilePath (FileContent m)))
-readZipFile zipPath =
-    withFile zipPath ReadMode $ \handle' -> runExceptT $ do
-      end <- except . first FailedEndReading =<< liftIO (readEnd handle')
-      central <- except . first FailedCentralDirectoryReading =<< liftIO (readCentralDirectory handle' end)
-      pure $
-        (\header -> ( MkFileContent
+readZipFile zipPath = do
+    eCentral <- readEndAndCentralDir zipPath
+    pure $ do
+        (end, central) <- eCentral
+        pure $ (\header -> ( MkFileContent
                   { fcFileHeader = fromFileHeader header
                   , fcFileContents = sourceFile zipPath header
                   })) <$> cdFileHeaders central
 
+readEndAndCentralDir :: FilePath -> IO (Either CodecErrors (End, CentralDirectory))
+readEndAndCentralDir zipPath =
+    withFile zipPath ReadMode $ \handle' -> runExceptT $ do
+      end <- except . first FailedEndReading =<< liftIO (readEnd handle')
+      central <- except . first FailedCentralDirectoryReading =<< liftIO (readCentralDirectory handle' end)
+      pure (end, central)
 
 -- | appends a bytestring to the content conduit
 appendBytestring :: Monad m => ByteString -> FileContent m -> FileContent m

@@ -46,6 +46,7 @@ tests =
                 [
                   testCase "file headers same" assertFileHeadersSame
                 , testCase "file content same" assertFileContenTheSame
+                , testCase "golden central dir same" assertCentralDirSame
                 , testCase "file content same async" assertFileContenTheSameAsync
                 , testCase "reads golden somezip" assertsReadsGoldenSomeZip
                 , testCase "cocnat many test 3" $ concatManyGeneric 3
@@ -167,6 +168,33 @@ assertFileHeadersSame = do
                   , ("test2.txt", appendBytestring "some another test text" defOptions)
                   , ("test3.txt", appendBytestring "one more" defOptions)
                   ]
+
+
+-- this may seem a little dumb but if you're going to refactor the format this better checks out
+-- naturaly if adding fields to  fileheader it's merely a case of updating it.
+-- so this may fail a lot, but if you didn't intend to update it it's a nice warning.
+assertCentralDirSame :: IO ()
+assertCentralDirSame = do
+    withSystemTempDirectory "zip-conduit" $ \dir -> do
+      writeZipFile (dir </> "somezip.zip") $ Map.fromList entriesInfo
+      res <- readEndAndCentralDir (dir </> "somezip.zip")
+      assertEqual "golden central dir same" golden res
+
+    where
+
+      entriesInfo :: [(FilePath, FileContent (ResourceT IO))]
+      entriesInfo = [ ("test1.txt", appendBytestring "some test text" defOptions)
+                  , ("test2.txt", appendBytestring "some another test text" defOptions)
+                  , ("test3.txt", appendBytestring "one more" defOptions)
+                  ]
+
+      golden = Right (End {
+                         endEntriesCount = 3, endCentralDirectorySize = 165, endCentralDirectoryOffset = 163, endZipComment = ""},
+                      CentralDirectory {cdFileHeaders =
+                                        Map.fromList [("test1.txt",FileHeader {fhBitFlag = 2, fhCompressionMethod = Deflate, fhLastModified = MSDOSDateTime {msDOSDate = 3441, msDOSTime = 0}, fhDataDescriptor = DataDescriptor {ddCRC32 = 359422662, ddCompressedSize = 14, ddUncompressedSize = 14}, fhInternalFileAttributes = 0, fhExternalFileAttributes = 0, fhRelativeOffset = 0, fhFileName = "test1.txt", fhExtraField = "", fhFileComment = ""}),
+                                                      ("test2.txt",FileHeader {fhBitFlag = 2, fhCompressionMethod = Deflate, fhLastModified = MSDOSDateTime {msDOSDate = 3441, msDOSTime = 0}, fhDataDescriptor = DataDescriptor {ddCRC32 = 1656754388, ddCompressedSize = 22, ddUncompressedSize = 22}, fhInternalFileAttributes = 0, fhExternalFileAttributes = 0, fhRelativeOffset = 53, fhFileName = "test2.txt", fhExtraField = "", fhFileComment = ""}),
+                                                      ("test3.txt",FileHeader {fhBitFlag = 2, fhCompressionMethod = Deflate, fhLastModified = MSDOSDateTime {msDOSDate = 3441, msDOSTime = 0}, fhDataDescriptor = DataDescriptor {ddCRC32 = 2223949387, ddCompressedSize = 10, ddUncompressedSize = 8}, fhInternalFileAttributes = 0, fhExternalFileAttributes = 0, fhRelativeOffset = 114, fhFileName = "test3.txt", fhExtraField = "", fhFileComment = ""})
+                                                     ]})
 
 assertFileContenTheSame :: IO ()
 assertFileContenTheSame = assertFileContenTheSameGeneral forM
