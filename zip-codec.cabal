@@ -81,6 +81,7 @@ library
     , text
     , time
     , transformers
+    , unliftio
   default-language: Haskell2010
 
 executable bench
@@ -136,6 +137,7 @@ executable bench
     , text
     , time
     , transformers
+    , unliftio
     , zip
     , zip-archive
     , zip-codec
@@ -197,5 +199,6 @@ test-suite unit
     , text
     , time
     , transformers
+    , unliftio
     , zip-codec
   default-language: Haskell2010

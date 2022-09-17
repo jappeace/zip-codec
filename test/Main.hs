@@ -6,6 +6,8 @@
 
 module Main where
 
+import Zip.Codec.OSFile
+import Data.Foldable
 import qualified Data.ByteString.Lazy as B
 import           Data.Word (Word8)
 import           System.IO (IOMode(..), withFile)
@@ -46,6 +48,10 @@ tests =
                 , testCase "file content same" assertFileContenTheSame
                 , testCase "file content same async" assertFileContenTheSameAsync
                 , testCase "reads golden somezip" assertsReadsGoldenSomeZip
+                , testCase "cocnat many test 3" $ concatManyGeneric 3
+                , testCase "cocnat many test 2" $ concatManyGeneric 2
+                , testCase "cocnat many test 4" $ concatManyGeneric 4
+                , testCase "cocnat many test 5" $ concatManyGeneric 5
                 -- , testCase "conduit uncompressed" (assertFileHeadersSame sinkEntryUncompressed)
                 -- -- , testCase "conduit parallel" (assertFileHeadersSame sinkEntryUncompressed)
                 -- , testCase "files      " (assertFiles Nothing)
@@ -207,8 +213,18 @@ assertFileContenTheSameGeneral forFun = do
                   , ("bigly5", readFileContent (dir </> "bigly5.file" ))
                   ]
 
-createFile :: FilePath -> Int -> IO ()
+createFile :: FilePath -> Int -> IO B.ByteString
 createFile path size =
     withFile path WriteMode $ \h -> do
         g <- getStdGen
-        B.hPut h $ B.pack $ take size (randoms g :: [Word8])
+        let content = B.pack $ take size (randoms g :: [Word8])
+        content <$ (B.hPut h content)
+
+concatManyGeneric :: Int -> IO ()
+concatManyGeneric size = do
+    withSystemTempDirectory ("concat-many-" <> show size) $ \dir -> do
+      let filepaths = (dir </>) . show <$> ([1..size] :: [Int])
+      expected <- traverse (\x -> createFile x 10) filepaths
+      res <- concatManyAsync filepaths
+      fileRes <- B.readFile res
+      assertEqual "concat produced a file that has same content" (fold expected) fileRes

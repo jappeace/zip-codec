@@ -73,6 +73,7 @@ dependencies:
 - digest
 - byteunits
 - async
+- unliftio
 
 library:
   source-dirs: src

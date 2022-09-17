@@ -5,9 +5,7 @@ module Zip.Codec.OSFile
   )
 where
 
-import Control.Monad
 import qualified Control.Concurrent.Async as Async
-import System.Directory
 import qualified Data.Conduit.Combinators as CC
 import System.IO
 import Data.Conduit
@@ -17,41 +15,33 @@ data FileConcat = MkFileConcat {
   , readFrom :: FilePath
   }
 
--- | Let's us figure out how to write the end
--- you'd say we could figure this out from input,
--- the issue is that the concurrent run makes
--- it uncertain whcih files get appended to what first
-data AsyncResult = MkAsyncResult {
-    asyncResultConcats :: [FileConcat]
-  , asyncResultNextLayer :: Maybe AsyncResult
-  }
-
-emptyResult :: AsyncResult
-emptyResult = MkAsyncResult [] Nothing
-
 -- | append the second file to the first file
 concatFilesInPlace :: FilePath -> FilePath -> IO FileConcat
-concatFilesInPlace one two =
-  FileConcat {writenInto = one, readFrom = two} <$
-  runConduitRes (CC.sourceFile two .| CC.sinkIOHandle (openFile one AppendMode))
+concatFilesInPlace one two = do
+  MkFileConcat {writenInto = one, readFrom = two} <$
+    runConduitRes (CC.sourceFile two .| CC.sinkIOHandle (openFile one AppendMode))
 
 -- | this will concat files asyncronusly and recursively
 --   resulting in a single file
-concatManyAsync :: [FilePath] -> IO AsyncResult
-concatManyAsync [] = pure emptyResult
-concatManyAsync paths =
+concatManyAsync :: [FilePath] -> IO FilePath
+concatManyAsync [] = pure [] -- wtf? crap goes in, crap goes out I suppose
+concatManyAsync allpaths@(apath:manypaths) =
   if length paths > 1 then do
+  -- putStrLn "loop"
   concats <- Async.mapConcurrently (uncurry concatFilesInPlace) filtered
-  manyRes <- concatManyAsync $ writenInto <$> concats
-  -- nice spacy leaky, we'll fix it when people start bitchin'.
-  pure $ MkAsyncResult {
-      asyncResultConcats = concats
-    , asyncResultNextLayer = Just manyRes
-    }
-  else pure emptyResult
+  let writtenInto = writenInto <$> concats -- this halves the pairing
+  concatManyAsync $ case remainder of
+    Just x -> x : writtenInto
+    Nothing -> writtenInto
+  else pure apath
   where
+    -- we don't do the first one if we have an odd count,
+    -- this prevents resource locking
+    (remainder, paths) = if odd (length allpaths) then (Just apath, manypaths) else (Nothing, allpaths)
+
     paired :: [((FilePath, FilePath), Int)]
     paired = zip (pairs paths) numbers
+
 
     filtered = fmap fst $ filter (\(_, num) -> even num) paired
 
