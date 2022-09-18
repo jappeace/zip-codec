@@ -64,8 +64,8 @@ multiples :: FilePath
 multiples dir names = [bgroup "multiplefiles"
   [ bgroup "archive"
              [
-             --   bench "codec"       $ nfIO $ zipCodecMultiple dir $ show <$> names
-             -- , bench "zip"         $ nfIO $ zipZipMultiple dir $ show <$> names
+               bench "codec"       $ nfIO $ zipCodecMultiple dir $ show <$> names
+             , bench "zip"         $ nfIO $ zipZipMultiple dir $ show <$> names
              ]
   , bgroup "unarchive"
              [
