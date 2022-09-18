@@ -55,7 +55,7 @@ main = do
         prepareFiles dir singleSizes
         prepareFiles dir multipleSizes
         defaultMain $
-          (singles dir singleSizes) <>
+          -- (singles dir singleSizes) <>
           multiples dir multipleSizes
 
 multiples :: FilePath
