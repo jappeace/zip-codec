@@ -16,7 +16,6 @@ import           Data.Digest.CRC32 (crc32Update)
 import           Prelude hiding (readFile, zip)
 import           Data.ByteString (ByteString)
 import           Data.Word
-import           Control.Monad.Trans.Resource (MonadResource)
 import           Data.Conduit (ConduitT, (.|), ZipConduit(..))
 import qualified Data.Conduit.Combinators as CC
 import           Data.Conduit.Zlib (WindowBits(..), compress)
@@ -28,7 +27,7 @@ newtype Compressed =
 
 -- | compresses data according to compression method
 --   the datadescriptor is used to figure out the end and central directory
-compressData :: forall m . (PrimMonad m, MonadResource m, MonadThrow m)
+compressData :: forall m . (PrimMonad m, MonadThrow m)
          => CompressionMethod -> ConduitT ByteString Compressed m DataDescriptor
 compressData compression = do
     ((uncompressedSize, crc32), compressedSize) <- getZipConduit compressionZip
@@ -49,7 +48,7 @@ compressData compression = do
                 Deflate       -> (,) <$> sizeCrc32Fold <*> compressSizeFold
 
 
-sizeCrc32Fold :: (MonadResource m, PrimMonad m) => ZipConduit ByteString o m (Int, Word32)
+sizeCrc32Fold :: (PrimMonad m) => ZipConduit ByteString o m (Int, Word32)
 sizeCrc32Fold =  (,) <$> ZipConduit sizeFold <*> crc32Fold
 
 compressSizeFold :: (PrimMonad m, MonadThrow m) => ZipConduit ByteString Compressed m Int

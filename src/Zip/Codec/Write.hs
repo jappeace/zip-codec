@@ -65,9 +65,6 @@ updateFileHeader :: DataDescriptor -> FileHeader -> FileHeader
 updateFileHeader dd fh = fh { fhDataDescriptor = dd
                             }
 
--- TODO append files
-
-
 writeFinish :: Handle -> CentralDirectory -> End -> IO ()
 writeFinish h centralDir end = do
     writeCentralDirectory h centralDir
