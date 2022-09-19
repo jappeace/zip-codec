@@ -1,11 +1,13 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE PackageImports #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# LANGUAGE RankNTypes #-}
 
 module Main where
 
+import           System.IO.Temp (withSystemTempDirectory)
 import Zip.Codec.OSFile
 import Data.Foldable
 import qualified Data.ByteString.Lazy as B
@@ -26,16 +28,16 @@ import Data.Serialize.Put
 import Test.Tasty
 import Test.Tasty.HUnit
 import qualified Data.Map as Map
-import System.IO.Temp(withSystemTempDirectory)
-import           System.FilePath ((</>))
+import           System.FilePath ((</>), (<.>))
 import Control.Exception
 import Control.Monad.Trans.Resource
 import Zip.Codec
-import Control.Lens
+import Control.Lens hiding ((<.>))
 import Zip.Codec.FileHeader
 import Test.Tasty.QuickCheck as QC
 import Test.QuickCheck.Instances()
 import qualified Data.Map.Merge.Lazy as Map
+import qualified "zip-archive" Codec.Archive.Zip as A
 
 main :: IO ()
 main = defaultMain tests
@@ -47,6 +49,7 @@ tests =
                   testCase "file headers same" assertFileHeadersSame
                 , testCase "file content same" assertFileContenTheSame
                 , testCase "golden central dir same" assertCentralDirSame
+                , testCase "golden against archive" unZipArchive
                 , testCase "file content same async" assertFileContenTheSameAsync
                 , testCase "reads golden somezip" assertsReadsGoldenSomeZip
                 , testCase "cocnat many test 3" $ concatManyGeneric 3
@@ -256,3 +259,14 @@ concatManyGeneric size = do
       res <- concatManyAsync filepaths
       fileRes <- B.readFile res
       assertEqual "concat produced a file that has same content" (fold expected) fileRes
+
+
+unZipArchive :: IO ()
+unZipArchive = do
+    withSystemTempDirectory ("archive-implementation") $ \dir -> do
+      let name = "xyz"
+          path = dir </> name
+      createFile path 100
+      writeZipFile (path <.> "zip") $ Map.singleton "somename" $ readFileContent path
+      bytes <- B.readFile (dir </> name <.> "zip")
+      A.extractFilesFromArchive [] $ A.toArchive bytes

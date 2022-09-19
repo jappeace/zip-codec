@@ -91,6 +91,7 @@ tests:
     - temporary
     - lens
     - quickcheck-instances
+    - zip-archive    
 
 executables:
   bench:
