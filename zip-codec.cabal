@@ -201,5 +201,6 @@ test-suite unit
     , time
     , transformers
     , unliftio
+    , zip-archive
     , zip-codec
   default-language: Haskell2010
