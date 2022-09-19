@@ -37,22 +37,27 @@ import Control.Monad.Catch (MonadThrow)
 sinkFile :: (MonadResource m, PrimMonad m, MonadThrow m) => CentralDirectory -> End -> FilePath ->  FilePath -> FileInZipOptions -> ConduitT ByteString Void m (CentralDirectory, End)
 sinkFile existingCentralDir end zipPath filePath options =
     bracketP (openFile zipPath ReadWriteMode) hClose $ \handle -> do
-    fileHeaderOld <- liftIO $ appendLocalFileHeader handle end filePath options
-    dd <- compressData (fizCompression options) `fuseUpstream` sinkDataHandle handle
+
+    dd <- noCentralDirSink handle end filePath options
+
     let newCentralDir = mkNewCentralDir fileHeader
         fileHeader = updateFileHeader dd fileHeaderOld
         newEnd = updateEnd dd fileHeader end
 
-    liftIO $ do
-      writeDataDescriptorFields handle dd offset
-      writeFinish handle newCentralDir newEnd
+    liftIO $ writeFinish handle newCentralDir newEnd
 
     pure (newCentralDir, newEnd)
   where
-    offset = fromIntegral $ endCentralDirectoryOffset end
+    fileHeaderOld = mkFileHeader filePath options $ endCentralDirectoryOffset end
 
     mkNewCentralDir header = CentralDirectory $
       Map.insert filePath header $ cdFileHeaders existingCentralDir
+
+noCentralDirSink :: (MonadResource m, PrimMonad m, MonadThrow m) => Handle ->  End -> FilePath -> FileInZipOptions -> ConduitT ByteString Void m DataDescriptor
+noCentralDirSink handle end filePath options = do
+    _ <- liftIO $ appendLocalFileHeader handle end filePath options
+    dd <- compressData (fizCompression options) `fuseUpstream` sinkDataHandle handle
+    pure dd
 
 updateEnd :: DataDescriptor -> FileHeader -> End -> End
 updateEnd dd fh end = end {
