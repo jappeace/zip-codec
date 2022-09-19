@@ -7,6 +7,7 @@ module Zip.Codec.Write
   -- * config helpers
   , FileInZipOptions(..)
   , fromFileHeader
+  , writeFinish
   )
 where
 
@@ -22,10 +23,10 @@ import           Prelude hiding (readFile, zip)
 import           Data.ByteString (ByteString)
 import           Data.Time (UTCTime(..))
 import           Data.Word
-import           System.IO (Handle, IOMode(..), SeekMode(..), hSeek, openFile, hClose)
-import           Control.Monad.IO.Class (liftIO)
+import           System.IO (Handle)
 import           Control.Monad.Trans.Resource (MonadResource)
-import           Data.Conduit (ConduitT, (.|), bracketP, fuseUpstream)
+import           Data.Conduit (ConduitT, (.|), fuseUpstream, yield)
+import Data.Serialize.Put
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Combinators as CC
 import Zip.Codec.CentralDirectory
@@ -34,17 +35,13 @@ import Control.Monad.Catch (MonadThrow)
 
 -- | writes a single file into a zip file
 --   note that this doesn't write a fisih
-sinkFile :: (MonadResource m, PrimMonad m, MonadThrow m) => CentralDirectory -> End -> FilePath ->  FilePath -> FileInZipOptions -> ConduitT ByteString Void m (CentralDirectory, End)
-sinkFile existingCentralDir end zipPath filePath options =
-    bracketP (openFile zipPath ReadWriteMode) hClose $ \handle -> do
-
+sinkFile :: (MonadResource m, PrimMonad m, MonadThrow m) => CentralDirectory -> End -> Handle ->  FilePath -> FileInZipOptions -> ConduitT ByteString Void m (CentralDirectory, End)
+sinkFile existingCentralDir end handle filePath options = do
     dd <- noCentralDirSink handle end filePath options
 
     let newCentralDir = mkNewCentralDir fileHeader
         fileHeader = updateFileHeader dd fileHeaderOld
         newEnd = updateEnd dd fileHeader end
-
-    liftIO $ writeFinish handle newCentralDir newEnd
 
     pure (newCentralDir, newEnd)
   where
@@ -53,11 +50,20 @@ sinkFile existingCentralDir end zipPath filePath options =
     mkNewCentralDir header = CentralDirectory $
       Map.insert filePath header $ cdFileHeaders existingCentralDir
 
+
 noCentralDirSink :: (MonadResource m, PrimMonad m, MonadThrow m) => Handle ->  End -> FilePath -> FileInZipOptions -> ConduitT ByteString Void m DataDescriptor
 noCentralDirSink handle end filePath options = do
-    _ <- liftIO $ appendLocalFileHeader handle end filePath options
-    dd <- compressData (fizCompression options) `fuseUpstream` sinkDataHandle handle
-    pure dd
+    fileInZipConduit filePath options (endCentralDirectoryOffset end)
+      `fuseUpstream` sinkDataHandle handle
+
+newtype FileInZip = MkFileInZip { unFileInZip :: ByteString }
+
+fileInZipConduit :: (MonadResource m, PrimMonad m, MonadThrow m) =>  FilePath -> FileInZipOptions -> Word32 -> ConduitT ByteString FileInZip m DataDescriptor
+fileInZipConduit filePath options offset = do
+    yield $ MkFileInZip $ runPut $ putLocalFileHeader fh
+    compressData (fizCompression options) `fuseUpstream` CC.map (MkFileInZip . unCompressedChunck)
+    where
+    fh     = mkFileHeader filePath options offset
 
 updateEnd :: DataDescriptor -> FileHeader -> End -> End
 updateEnd dd fh end = end {
@@ -75,15 +81,6 @@ writeFinish h centralDir end = do
     writeCentralDirectory h centralDir
     writeEnd h $ end{ endEntriesCount = fromIntegral (length $ cdFileHeaders centralDir) }
 
-
-appendLocalFileHeader :: Handle -> End -> FilePath -> FileInZipOptions -> IO FileHeader
-appendLocalFileHeader handle end filePath options = do
-    hSeek handle AbsoluteSeek offset -- this  appears to override the previous central dir
-    writeLocalFileHeader handle fh
-    return fh
-  where
-    offset = fromIntegral $ endCentralDirectoryOffset end
-    fh     = mkFileHeader filePath options (fromIntegral offset)
 
 mkFileHeader :: FilePath -> FileInZipOptions -> Word32 -> FileHeader
 mkFileHeader filePath options relativeOffset =
@@ -120,6 +117,6 @@ fromFileHeader FileHeader{..} =
   , fizComment      = fhFileComment
   }
 
-sinkDataHandle :: forall m . (PrimMonad m, MonadResource m) => Handle -> ConduitT Compressed Void m ()
+sinkDataHandle :: forall m . (PrimMonad m, MonadResource m) => Handle -> ConduitT FileInZip Void m ()
 sinkDataHandle handle' =
-  CC.map unCompressedChunck .|  CB.sinkHandle handle'
+  CC.map unFileInZip .|  CB.sinkHandle handle'

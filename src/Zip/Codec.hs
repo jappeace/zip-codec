@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -w #-}
 
 -- | High level interface for reading/writing zipfiles.
 module Zip.Codec
@@ -22,7 +21,7 @@ module Zip.Codec
   )
 where
 
-import Control.Monad(void)
+import           System.IO (Handle, IOMode(..), openFile, hClose)
 import Zip.Codec.Time
 import qualified Data.Map as Map
 import Control.Monad.Trans.Class
@@ -30,13 +29,13 @@ import Data.Traversable
 import Control.Monad.Trans.State.Lazy
 import Data.Conduit(runConduitRes, ConduitT, (.|), yield)
 import qualified Data.Conduit.Combinators as CC
-import Control.Exception
+import Control.Exception hiding (handle)
 import Zip.Codec.End
 import Zip.Codec.FileHeader
 import           Prelude hiding (readFile, zip)
 import           Data.ByteString (ByteString)
 import           Data.Time (UTCTime(..))
-import           System.IO (IOMode(..), withFile)
+import           System.IO (withFile)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Trans.Resource
 import Data.Map(Map)
@@ -46,7 +45,6 @@ import Data.Bifunctor
 import Control.Monad.Primitive
 import Zip.Codec.Read
 import Zip.Codec.Write
-import Zip.Codec.OSFile
 
 data CodecErrors = FailedEndReading String
                  | FailedCentralDirectoryReading CenteralDirErrors
@@ -63,7 +61,7 @@ readZipFile :: (MonadThrow m, PrimMonad m, MonadResource m) => FilePath -> IO (E
 readZipFile zipPath = do
     eCentral <- readEndAndCentralDir zipPath
     pure $ do
-        (end, central) <- eCentral
+        (_end, central) <- eCentral
         pure $ (\header -> ( MkFileContent
                   { fcFileHeader = fromFileHeader header
                   , fcFileContents = sourceFile zipPath header
@@ -100,13 +98,15 @@ writeZipFile ::
   -- | A map with as key the filename of the zipfile and value the content desscription of a file.
   Map FilePath (FileContent (ResourceT IO)) ->
   IO ()
-writeZipFile zipPath filesMap =
-  void $ flip execStateT (emptyCentralDirectory, emptyEnd) $
-        forM files $ \curFile -> do
-           state' <- get
-           res <- lift $ writeFileContent zipPath state' curFile
-           put res
+writeZipFile zipPath filesMap = do
+  bracket (openFile zipPath ReadWriteMode) hClose $ \handle -> do
+    (newCentralDir, newEnd) <- flip execStateT (emptyCentralDirectory, emptyEnd) $
+          forM files $ \curFile -> do
+            state' <- get
+            res <- lift $ writeFileContent handle state' curFile
+            put res
 
+    liftIO $ writeFinish handle newCentralDir newEnd
   where
     files :: [(FilePath, FileContent (ResourceT IO))]
     files = Map.toList filesMap
@@ -114,17 +114,17 @@ writeZipFile zipPath filesMap =
 -- | Write a single file content to a zipfile.
 writeFileContent ::
   -- | the path to the zipfile to be written
-  FilePath ->
+  Handle ->
   -- | previous central directory and end
   (CentralDirectory, End) ->
   -- | the file to be written within a zipfile
   (FilePath, FileContent (ResourceT IO)) ->
   -- | new central directory and end
   IO (CentralDirectory, End)
-writeFileContent zipPath (centralDir, end) (filePath, fileContents) =
+writeFileContent handle (centralDir, end) (filePath, fileContents) =
   runConduitRes $
              fcFileContents fileContents .|
-             sinkFile centralDir end zipPath filePath (fcFileHeader fileContents)
+             sinkFile centralDir end handle filePath (fcFileHeader fileContents)
 
 -- | empty file content
 defOptions :: Monad m => FileContent m
