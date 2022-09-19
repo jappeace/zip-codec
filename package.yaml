@@ -109,5 +109,5 @@ executables:
       - zip-stream
       - indexed-traversable
 
-  ghc-options:
+    ghc-options:
       - -O2
