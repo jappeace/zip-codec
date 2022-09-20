@@ -132,7 +132,6 @@ defOptions = MkFileContent
     { fcFileHeader = MkFileInZipOptions
       { fizCompression  = Deflate
       , fizModification = msDOSDateTimeToUTCTime $ utcTimeToMSDOSDateTime (UTCTime { utctDay = toEnum 0, utctDayTime = 0})
-      , fizBitflag      = 2  -- max compression for deflate compression method
       , fizExtraField   = mempty
       , fizComment      = mempty
       }

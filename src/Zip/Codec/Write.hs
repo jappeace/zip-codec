@@ -1,6 +1,8 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+{-# OPTIONS_GHC -w #-}
+
 -- | Functions for writing entire zip files
 module Zip.Codec.Write
   ( sinkFile
@@ -44,13 +46,10 @@ sinkFile existingCentralDir end handle filePath options = do
         fileHeader = updateFileHeader dd fileHeaderOld
         newEnd = updateEnd dd fileHeader end
 
-    liftIO $ do
-      writeDataDescriptorFields handle dd offset
     pure (newCentralDir, newEnd)
   where
     fileHeaderOld = mkFileHeader filePath options $ endCentralDirectoryOffset end
 
-    offset = fromIntegral $ endCentralDirectoryOffset end
     mkNewCentralDir header = CentralDirectory $
       Map.insert filePath header $ cdFileHeaders existingCentralDir
 
@@ -62,17 +61,23 @@ noCentralDirSink handle end filePath options = do
 
 newtype FileInZip = MkFileInZip { unFileInZip :: ByteString }
 
+-- | Use of this conduit requires setting bit 3 of the general purpose
+--   bitflag
 fileInZipConduit :: (MonadResource m, PrimMonad m, MonadThrow m) =>  FilePath -> FileInZipOptions -> Word32 -> ConduitT ByteString FileInZip m DataDescriptor
 fileInZipConduit filePath options offset = do
     yield $ MkFileInZip $ runPut $ putLocalFileHeader fh
-    compressData (fizCompression options) `fuseUpstream` CC.map (MkFileInZip . unCompressedChunck)
+    dd <- compressData (fizCompression options) `fuseUpstream` CC.map (MkFileInZip . unCompressedChunck)
+    yield $ MkFileInZip $ runPut $ do
+      putWord32le 0x08074b50
+      putDataDescriptor dd
+    pure dd
     where
     fh     = mkFileHeader filePath options offset
 
 updateEnd :: DataDescriptor -> FileHeader -> End -> End
 updateEnd dd fh end = end {
     endCentralDirectoryOffset = endCentralDirectoryOffset end
-                            + (localFileHeaderLength fh + ddCompressedSize dd)
+                            + (localFileHeaderLength fh + ddCompressedSize dd) + 16
   , endCentralDirectorySize = endCentralDirectorySize end + (fileHeaderLength fh)
   }
 
@@ -88,7 +93,7 @@ writeFinish h centralDir end = do
 
 mkFileHeader :: FilePath -> FileInZipOptions -> Word32 -> FileHeader
 mkFileHeader filePath options relativeOffset =
-    FileHeader { fhBitFlag                = fizBitflag options
+    FileHeader { fhBitFlag                = toggleDeferDataDescriptor $ toggleMaxCOmpressionDeflate unsertBitflag
                , fhCompressionMethod      = fizCompression options
                , fhLastModified           = utcTimeToMSDOSDateTime $ fizModification options
                , fhDataDescriptor         = emptyDataDescriptor
@@ -106,7 +111,6 @@ data FileInZipOptions = MkFileInZipOptions {
     -- | the modification time, not that this is clamped to 'MSDOSDateTime' (silently)
     --   see 'utcTimeToMSDOSDateTime' for details
   , fizModification :: UTCTime
-  , fizBitflag      :: Word16
   , fizExtraField   :: ByteString
   , fizComment      :: Text
   } deriving (Show, Eq)
@@ -116,7 +120,6 @@ fromFileHeader FileHeader{..} =
   MkFileInZipOptions
   { fizCompression  = fhCompressionMethod
   , fizModification = msDOSDateTimeToUTCTime fhLastModified
-  , fizBitflag      = fhBitFlag
   , fizExtraField   = fhExtraField
   , fizComment      = fhFileComment
   }

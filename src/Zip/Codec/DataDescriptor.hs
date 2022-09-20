@@ -4,7 +4,6 @@
 --   it includes a checksum, compressed and uncompressed sizes.
 module Zip.Codec.DataDescriptor
   ( DataDescriptor(..)
-  , writeDataDescriptorFields
   , writeDataDescriptor
   , putDataDescriptor
   , getDataDescriptor
@@ -54,12 +53,3 @@ putDataDescriptor dd = do
     putWord32le $ ddCRC32 dd
     putWord32le $ ddCompressedSize dd
     putWord32le $ ddUncompressedSize dd
-
--- | Writes data descriptor fields
---   This appears at the end of file dataa
-writeDataDescriptorFields :: Handle -> DataDescriptor -> Integer -> IO ()
-writeDataDescriptorFields h dd offset = do
-    old <- hTell h
-    hSeek h AbsoluteSeek $ offset + 4 + 2 + 2 + 2 + 2 + 2
-    writeDataDescriptor h dd
-    hSeek h AbsoluteSeek old

@@ -84,6 +84,9 @@ assertsReadsGoldenSomeZip = do
             assertEqual "contents same" ["", "xxx\n", "yyyyyy\n", "zzzzzzzzzzzz\n"]
                                         results
 
+instance Arbitrary GeneralPurposeBitflag where
+  arbitrary  = MkGeneralPurposeBitflag <$> arbitrary
+
 instance Arbitrary End where
   arbitrary = End <$> arbitrary <*> arbitrary <*> arbitrary <*> (encodeUtf8 <$> arbitrary)
 
@@ -192,11 +195,11 @@ assertCentralDirSame = do
                   ]
 
       golden = Right (End {
-                         endEntriesCount = 3, endCentralDirectorySize = 165, endCentralDirectoryOffset = 163, endZipComment = ""},
+                         endEntriesCount = 3, endCentralDirectorySize = 165, endCentralDirectoryOffset = 163 + 3*16, endZipComment = ""},
                       CentralDirectory {cdFileHeaders =
-                                        Map.fromList [("test1.txt",FileHeader {fhBitFlag = 2, fhCompressionMethod = Deflate, fhLastModified = MSDOSDateTime {msDOSDate = 3441, msDOSTime = 0}, fhDataDescriptor = DataDescriptor {ddCRC32 = 359422662, ddCompressedSize = 14, ddUncompressedSize = 14}, fhInternalFileAttributes = 0, fhExternalFileAttributes = 0, fhRelativeOffset = 0, fhFileName = "test1.txt", fhExtraField = "", fhFileComment = ""}),
-                                                      ("test2.txt",FileHeader {fhBitFlag = 2, fhCompressionMethod = Deflate, fhLastModified = MSDOSDateTime {msDOSDate = 3441, msDOSTime = 0}, fhDataDescriptor = DataDescriptor {ddCRC32 = 1656754388, ddCompressedSize = 22, ddUncompressedSize = 22}, fhInternalFileAttributes = 0, fhExternalFileAttributes = 0, fhRelativeOffset = 53, fhFileName = "test2.txt", fhExtraField = "", fhFileComment = ""}),
-                                                      ("test3.txt",FileHeader {fhBitFlag = 2, fhCompressionMethod = Deflate, fhLastModified = MSDOSDateTime {msDOSDate = 3441, msDOSTime = 0}, fhDataDescriptor = DataDescriptor {ddCRC32 = 2223949387, ddCompressedSize = 10, ddUncompressedSize = 8}, fhInternalFileAttributes = 0, fhExternalFileAttributes = 0, fhRelativeOffset = 114, fhFileName = "test3.txt", fhExtraField = "", fhFileComment = ""})
+                                        Map.fromList [("test1.txt",FileHeader {fhBitFlag = 10, fhCompressionMethod = Deflate, fhLastModified = MSDOSDateTime {msDOSDate = 3441, msDOSTime = 0}, fhDataDescriptor = DataDescriptor {ddCRC32 = 359422662, ddCompressedSize = 14, ddUncompressedSize = 14}, fhInternalFileAttributes = 0, fhExternalFileAttributes = 0, fhRelativeOffset = 0, fhFileName = "test1.txt", fhExtraField = "", fhFileComment = ""}),
+                                                      ("test2.txt",FileHeader {fhBitFlag = 10, fhCompressionMethod = Deflate, fhLastModified = MSDOSDateTime {msDOSDate = 3441, msDOSTime = 0}, fhDataDescriptor = DataDescriptor {ddCRC32 = 1656754388, ddCompressedSize = 22, ddUncompressedSize = 22}, fhInternalFileAttributes = 0, fhExternalFileAttributes = 0, fhRelativeOffset = 69, fhFileName = "test2.txt", fhExtraField = "", fhFileComment = ""}),
+                                                      ("test3.txt",FileHeader {fhBitFlag = 10, fhCompressionMethod = Deflate, fhLastModified = MSDOSDateTime {msDOSDate = 3441, msDOSTime = 0}, fhDataDescriptor = DataDescriptor {ddCRC32 = 2223949387, ddCompressedSize = 10, ddUncompressedSize = 8}, fhInternalFileAttributes = 0, fhExternalFileAttributes = 0, fhRelativeOffset = 146, fhFileName = "test3.txt", fhExtraField = "", fhFileComment = ""})
                                                      ]})
 
 assertFileContenTheSame :: IO ()
@@ -259,7 +262,6 @@ concatManyGeneric size = do
       res <- concatManyAsync filepaths
       fileRes <- B.readFile res
       assertEqual "concat produced a file that has same content" (fold expected) fileRes
-
 
 unZipArchive :: IO ()
 unZipArchive = do
