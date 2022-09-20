@@ -32,6 +32,7 @@ import qualified Data.Conduit.Combinators as CC
 import Zip.Codec.CentralDirectory
 import Control.Monad.Primitive
 import Control.Monad.Catch (MonadThrow)
+import Control.Monad.IO.Class(liftIO)
 
 -- | writes a single file into a zip file
 --   note that this doesn't write a fisih
@@ -43,10 +44,13 @@ sinkFile existingCentralDir end handle filePath options = do
         fileHeader = updateFileHeader dd fileHeaderOld
         newEnd = updateEnd dd fileHeader end
 
+    liftIO $ do
+      writeDataDescriptorFields handle dd offset
     pure (newCentralDir, newEnd)
   where
     fileHeaderOld = mkFileHeader filePath options $ endCentralDirectoryOffset end
 
+    offset = fromIntegral $ endCentralDirectoryOffset end
     mkNewCentralDir header = CentralDirectory $
       Map.insert filePath header $ cdFileHeaders existingCentralDir
 
