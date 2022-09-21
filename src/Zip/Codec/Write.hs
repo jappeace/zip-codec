@@ -77,9 +77,12 @@ fileInZipConduit filePath options offset = do
 updateEnd :: DataDescriptor -> FileHeader -> End -> End
 updateEnd dd fh end = end {
     endCentralDirectoryOffset = endCentralDirectoryOffset end
-                            + (localFileHeaderLength fh + ddCompressedSize dd) + 16
+                            + (localFileHeaderLength fh + ddCompressedSize dd) + dataDescriptorAndSigSize
   , endCentralDirectorySize = endCentralDirectorySize end + (fileHeaderLength fh)
   }
+
+  where
+    dataDescriptorAndSigSize = 16
 
 updateFileHeader :: DataDescriptor -> FileHeader -> FileHeader
 updateFileHeader dd fh = fh { fhDataDescriptor = dd
