@@ -6,6 +6,7 @@
 -- | Functions for writing entire zip files
 module Zip.Codec.Write
   ( sinkFile
+  , SinkFileResult(..)
   -- * config helpers
   , FileInZipOptions(..)
   , fromFileHeader
@@ -36,9 +37,15 @@ import Control.Monad.Primitive
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class(liftIO)
 
+data SinkFileResult = MkSinkFileResult
+  { sfrCentralDirectory :: CentralDirectory
+  , sfrEnd :: End
+  , sfrFileHeader :: FileHeader
+  }
+
 -- | writes a single file into a zip file
 --   note that this doesn't write a fisih
-sinkFile :: (MonadResource m, PrimMonad m, MonadThrow m) => CentralDirectory -> End -> Handle ->  FilePath -> FileInZipOptions -> ConduitT ByteString Void m (CentralDirectory, End)
+sinkFile :: (MonadResource m, PrimMonad m, MonadThrow m) => CentralDirectory -> End -> Handle ->  FilePath -> FileInZipOptions -> ConduitT ByteString Void m SinkFileResult
 sinkFile existingCentralDir end handle filePath options = do
     dd <- noCentralDirSink handle end filePath options
 
@@ -46,7 +53,12 @@ sinkFile existingCentralDir end handle filePath options = do
         fileHeader = updateFileHeader dd fileHeaderOld
         newEnd = updateEnd dd fileHeader end
 
-    pure (newCentralDir, newEnd)
+    pure $ MkSinkFileResult
+      { sfrCentralDirectory = newCentralDir
+      , sfrEnd = newEnd
+      , sfrFileHeader = fileHeader
+      }
+
   where
     fileHeaderOld = mkFileHeader filePath options $ endCentralDirectoryOffset end
 

@@ -10,6 +10,7 @@ module Zip.Codec.CentralDirectory
   , writeCentralDirectory
   , putCentralDirectory
   , emptyCentralDirectory
+  , insertFile
   )
 where
 
@@ -24,6 +25,7 @@ import Zip.Codec.End
 import Control.Applicative(many)
 import Data.Functor((<&>))
 import Data.Bifunctor
+import qualified Data.Map as Map
 
 
 -- | Central directory structure:
@@ -37,7 +39,11 @@ newtype CentralDirectory = CentralDirectory
     -- a hashmap maybe faster but it opens up a DoS vulnrability
     -- due to fnv being vulnrable to universal collisions.
     { cdFileHeaders      :: Map FilePath FileHeader -- this representation will filter out double files for better or worse.
-    } deriving (Show, Eq)
+    } deriving stock (Show, Eq)
+
+
+insertFile :: FilePath -> FileHeader -> CentralDirectory -> CentralDirectory
+insertFile path file (CentralDirectory map') = CentralDirectory $ Map.insert path file map'
 
 emptyCentralDirectory :: CentralDirectory
 emptyCentralDirectory = CentralDirectory mempty

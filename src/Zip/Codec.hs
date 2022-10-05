@@ -22,7 +22,10 @@ module Zip.Codec
   )
 where
 
-import           System.IO (Handle, IOMode(..), openFile, hClose)
+import Data.Foldable(foldl')
+import Zip.Codec.OSFile (concatManyAsync)
+import System.Directory(renameFile)
+import           System.IO (Handle, IOMode(..), openFile, hClose, openTempFile)
 import Zip.Codec.Time
 import qualified Data.Map as Map
 import Control.Monad.Trans.Class
@@ -46,6 +49,8 @@ import Data.Bifunctor
 import Control.Monad.Primitive
 import Zip.Codec.Read
 import Zip.Codec.Write
+import UnliftIO.Temporary (withSystemTempDirectory)
+import Control.Concurrent.Async(forConcurrently)
 
 data CodecErrors = FailedEndReading String
                  | FailedCentralDirectoryReading CenteralDirErrors
@@ -59,7 +64,8 @@ data FileContent m = MkFileContent
 -- | this opens up a file from the filesystem
 --   it provides a map of internal file with a conduit to the data
 readZipFile :: (MonadThrow m, PrimMonad m, MonadResource m) => FilePath -> IO (Either CodecErrors (Map FilePath (FileContent m)))
-readZipFile zipPath = do
+readZipFile zipPath =
+  do
     eCentral <- readEndAndCentralDir zipPath
     pure $ do
         (_end, central) <- eCentral
@@ -105,12 +111,18 @@ writeZipFile zipPath filesMap = do
           forM files $ \curFile -> do
             state' <- get
             res <- lift $ writeFileContent handle state' curFile
-            put res
+            put (sfrCentralDirectory res, sfrEnd res)
 
     liftIO $ writeFinish handle newCentralDir newEnd
   where
     files :: [(FilePath, FileContent (ResourceT IO))]
     files = Map.toList filesMap
+
+data ConcFileRes = MkConcFileRes
+  { cfrInZipPath :: FilePath
+  , cfrDiskPath  :: FilePath
+  , cfrSinkFileResult :: SinkFileResult
+  }
 
 writeZipFileAsync ::
   -- | Path to the zipfile to be written
@@ -118,21 +130,36 @@ writeZipFileAsync ::
   -- | A map with as key the filename of the zipfile and value the content desscription of a file.
   Map FilePath (FileContent (ResourceT IO)) ->
   IO ()
-writeZipFileAsync zipPath filesMap = do
+writeZipFileAsync zipPath filesMap = withSystemTempDirectory "writeZipFileAsync" $ \tempDir -> do
+  outputs <- forConcurrently files $ \contents -> do
+    let cfrInZipPath = fst contents
+    bracket (openTempFile tempDir cfrInZipPath) (hClose . snd) $ \(cfrDiskPath, handle) -> do
+      cfrSinkFileResult <- writeFileContent handle (emptyCentralDirectory, emptyEnd) contents
+      pure $ MkConcFileRes{..}
+
+  finalFile <- concatManyAsync $ cfrDiskPath <$> outputs
+
+  let endDir :: (End, CentralDirectory)
+        = foldl' updateDir (emptyEnd, emptyCentralDirectory) outputs
+
+  renameFile finalFile zipPath
+  withFile zipPath AppendMode $ \handle -> writeFinish handle (snd endDir) (fst endDir)
 
 
-
-  bracket (openFile zipPath ReadWriteMode) hClose $ \handle -> do
-    (newCentralDir, newEnd) <- flip execStateT (emptyCentralDirectory, emptyEnd) $
-          forM files $ \curFile -> do
-            state' <- get
-            res <- lift $ writeFileContent handle state' curFile
-            put res
-
-    liftIO $ writeFinish handle newCentralDir newEnd
   where
     files :: [(FilePath, FileContent (ResourceT IO))]
     files = Map.toList filesMap
+
+
+updateDir :: (End, CentralDirectory) -> ConcFileRes -> (End, CentralDirectory)
+updateDir (prevEnd, prevDir) current =
+  (prevEnd <> curEnd, insertFile path curHeader prevDir)
+  where
+    curEnd = sfrEnd sinkFile
+    curHeader =
+      (sfrFileHeader sinkFile) { fhRelativeOffset = endCentralDirectoryOffset prevEnd }
+    path = cfrInZipPath current
+    sinkFile = cfrSinkFileResult current
 
 -- | Write a single file content to a zipfile.
 writeFileContent ::
@@ -143,7 +170,7 @@ writeFileContent ::
   -- | the file to be written within a zipfile
   (FilePath, FileContent (ResourceT IO)) ->
   -- | new central directory and end
-  IO (CentralDirectory, End)
+  IO SinkFileResult
 writeFileContent handle (centralDir, end) (filePath, fileContents) =
   runConduitRes $
              fcFileContents fileContents .|

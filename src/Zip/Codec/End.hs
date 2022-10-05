@@ -13,6 +13,7 @@ module Zip.Codec.End
   , writeEnd
   , putEnd
   , emptyEnd
+  , appendEnd
   )
 where
 
@@ -46,6 +47,20 @@ data End = End
     , endCentralDirectoryOffset :: Word32 -- ^ offset of start of central
     , endZipComment             :: ByteString
     } deriving (Show, Eq)
+
+instance Semigroup End where
+  (<>) = appendEnd
+instance Monoid End where
+  mempty = emptyEnd
+  mappend = (<>)
+
+appendEnd :: End -> End -> End
+appendEnd one two = End {
+      endEntriesCount           = endEntriesCount one + endEntriesCount two
+    , endCentralDirectorySize   = endCentralDirectorySize   one + endCentralDirectorySize   two
+    , endCentralDirectoryOffset = endCentralDirectoryOffset one + endCentralDirectoryOffset two
+    , endZipComment             = endZipComment             one <> endZipComment             two
+    }
 
 emptyEnd :: End
 emptyEnd = End
