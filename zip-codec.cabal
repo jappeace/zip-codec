@@ -192,6 +192,7 @@ test-suite unit
     , old-time
     , primitive
     , quickcheck-instances
+    , random
     , resourcet
     , tasty
     , tasty-hunit

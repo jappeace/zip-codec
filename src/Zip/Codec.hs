@@ -15,6 +15,7 @@ module Zip.Codec
   , readEndAndCentralDir
     -- * writing
   , writeZipFile
+  , writeZipFileAsync
   , defOptions
   , fromFileHeader
   , appendBytestring
@@ -111,6 +112,28 @@ writeZipFile zipPath filesMap = do
     files :: [(FilePath, FileContent (ResourceT IO))]
     files = Map.toList filesMap
 
+writeZipFileAsync ::
+  -- | Path to the zipfile to be written
+  FilePath ->
+  -- | A map with as key the filename of the zipfile and value the content desscription of a file.
+  Map FilePath (FileContent (ResourceT IO)) ->
+  IO ()
+writeZipFileAsync zipPath filesMap = do
+
+
+
+  bracket (openFile zipPath ReadWriteMode) hClose $ \handle -> do
+    (newCentralDir, newEnd) <- flip execStateT (emptyCentralDirectory, emptyEnd) $
+          forM files $ \curFile -> do
+            state' <- get
+            res <- lift $ writeFileContent handle state' curFile
+            put res
+
+    liftIO $ writeFinish handle newCentralDir newEnd
+  where
+    files :: [(FilePath, FileContent (ResourceT IO))]
+    files = Map.toList filesMap
+
 -- | Write a single file content to a zipfile.
 writeFileContent ::
   -- | the path to the zipfile to be written
@@ -137,3 +160,4 @@ defOptions = MkFileContent
       }
     , fcFileContents     = yield mempty
     }
+

@@ -30,10 +30,8 @@ TODO:
       (apparantly the zip package does this right? see how they do it)
 + [x] figure out how to bench concurrent functions (I think by 
       default criterion already spawns a bunch of threads).
-
 + [ ] Add a concurrent writing implementation and test it.
   + [ ] Figure out how to track the central dir with that par writing method.
-
 + [ ] 64bit support (lol)
 
 ## Alternatives

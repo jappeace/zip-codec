@@ -7,6 +7,7 @@
 
 module Main where
 
+import Data.Map(Map)
 import           System.IO.Temp (withSystemTempDirectory)
 import Zip.Codec.OSFile
 import Data.Foldable
@@ -46,12 +47,7 @@ tests :: TestTree
 tests =
     testGroup "Unit tests"
                 [
-                  testCase "file headers same" assertFileHeadersSame
-                , testCase "file content same" assertFileContenTheSame
-                , testCase "golden central dir same" assertCentralDirSame
-                , testCase "golden against archive" unZipArchive
-                , testCase "file content same async" assertFileContenTheSameAsync
-                , testCase "reads golden somezip" assertsReadsGoldenSomeZip
+                  testCase "reads golden somezip" assertsReadsGoldenSomeZip
                 , testCase "cocnat many test 3" $ concatManyGeneric 3
                 , testCase "cocnat many test 2" $ concatManyGeneric 2
                 , testCase "cocnat many test 4" $ concatManyGeneric 4
@@ -67,6 +63,23 @@ tests =
                 , QC.testProperty "fileHeaderRoundTrip" fileHeaderRoundTrip
                 , QC.testProperty "centralDirectoryRoundTrip" centralDirectoryRoundTrip
                 , QC.testProperty "dataDescriptorRoundTrip" dataDescriptorRoundTrip
+                ,
+
+                testGroup "write sync" [
+                  testCase "file headers same" assertFileHeadersSame
+                , testCase "golden central dir same" assertCentralDirSame
+                , testCase "file content same" assertFileContenTheSame
+                , testCase "golden against archive" unZipArchive
+                , testCase "file content same async read" assertFileContenTheSameAsyncRead
+                ]
+                ,
+                testGroup "write async" [
+                  testCase "file headers same" assertFileHeadersSameAsync
+                , testCase "golden central dir same" assertCentralDirSameAsync
+                , testCase "golden against archive" unZipArchiveAsync
+                , testCase "file content same async" assertFileContenTheSameAsyncWrite
+                , testCase "file content same async read write" assertFileContenTheSameAsyncReadWrite
+                ]
                 ]
 
 -- this tests if we can decode a zip file made by another program
@@ -167,14 +180,28 @@ assertFileHeadersSame = do
           Right result ->
             assertEqual "list diff is same" (over (mapped . _2) fcFileHeader entriesInfo)
                                             ((over (mapped . _2) fcFileHeader $ Map.toList result))
-  where
-    archiveName = "test.zip"
-    entriesInfo :: [(FilePath, FileContent (ResourceT IO))]
-    entriesInfo = [ ("test1.txt", appendBytestring "some test text" defOptions)
-                  , ("test2.txt", appendBytestring "some another test text" defOptions)
-                  , ("test3.txt", appendBytestring "one more" defOptions)
-                  ]
 
+assertFileHeadersSameAsync :: IO ()
+assertFileHeadersSameAsync = do
+    withSystemTempDirectory "zip-conduit" $ \dir -> do
+        let archivePath = dir </> archiveName
+        _ <- writeZipFileAsync archivePath $ Map.fromList entriesInfo
+        result' <- readZipFile @(ResourceT IO) archivePath
+        case result' of
+          Left errors ->
+            throwIO errors
+          Right result ->
+            assertEqual "list diff is same" (over (mapped . _2) fcFileHeader entriesInfo)
+                                            ((over (mapped . _2) fcFileHeader $ Map.toList result))
+
+archiveName :: String
+archiveName = "test.zip"
+
+entriesInfo :: [(FilePath, FileContent (ResourceT IO))]
+entriesInfo = [ ("test1.txt", appendBytestring "some test text" defOptions)
+              , ("test2.txt", appendBytestring "some another test text" defOptions)
+              , ("test3.txt", appendBytestring "one more" defOptions)
+              ]
 
 -- this may seem a little dumb but if you're going to refactor the format this better checks out
 -- naturaly if adding fields to  fileheader it's merely a case of updating it.
@@ -186,15 +213,15 @@ assertCentralDirSame = do
       res <- readEndAndCentralDir (dir </> "somezip.zip")
       assertEqual "golden central dir same" golden res
 
-    where
+assertCentralDirSameAsync :: IO ()
+assertCentralDirSameAsync = do
+    withSystemTempDirectory "zip-conduit" $ \dir -> do
+      writeZipFileAsync (dir </> "somezip.zip") $ Map.fromList entriesInfo
+      res <- readEndAndCentralDir (dir </> "somezip.zip")
+      assertEqual "golden central dir same" golden res
 
-      entriesInfo :: [(FilePath, FileContent (ResourceT IO))]
-      entriesInfo = [ ("test1.txt", appendBytestring "some test text" defOptions)
-                  , ("test2.txt", appendBytestring "some another test text" defOptions)
-                  , ("test3.txt", appendBytestring "one more" defOptions)
-                  ]
 
-      golden = Right (End {
+golden = Right (End {
                          endEntriesCount = 3, endCentralDirectorySize = 165, endCentralDirectoryOffset = 163 + 3*16, endZipComment = ""},
                       CentralDirectory {cdFileHeaders =
                                         Map.fromList [("test1.txt",FileHeader {fhBitFlag = 10, fhCompressionMethod = Deflate, fhLastModified = MSDOSDateTime {msDOSDate = 3441, msDOSTime = 0}, fhDataDescriptor = DataDescriptor {ddCRC32 = 359422662, ddCompressedSize = 14, ddUncompressedSize = 14}, fhInternalFileAttributes = 0, fhExternalFileAttributes = 0, fhRelativeOffset = 0, fhFileName = "test1.txt", fhExtraField = "", fhFileComment = ""}),
@@ -203,13 +230,21 @@ assertCentralDirSame = do
                                                      ]})
 
 assertFileContenTheSame :: IO ()
-assertFileContenTheSame = assertFileContenTheSameGeneral forM
+assertFileContenTheSame = assertFileContenTheSameGeneral writeZipFile forM
 
-assertFileContenTheSameAsync :: IO ()
-assertFileContenTheSameAsync = assertFileContenTheSameGeneral Async.forConcurrently
+assertFileContenTheSameAsyncRead :: IO ()
+assertFileContenTheSameAsyncRead = assertFileContenTheSameGeneral writeZipFile Async.forConcurrently
 
-assertFileContenTheSameGeneral :: (forall t a b. Traversable t => t a -> (a -> IO b) -> IO (t b))  -> IO ()
-assertFileContenTheSameGeneral forFun = do
+assertFileContenTheSameAsyncWrite :: IO ()
+assertFileContenTheSameAsyncWrite = assertFileContenTheSameGeneral writeZipFileAsync forM
+
+assertFileContenTheSameAsyncReadWrite :: IO ()
+assertFileContenTheSameAsyncReadWrite = assertFileContenTheSameGeneral writeZipFileAsync Async.forConcurrently
+
+assertFileContenTheSameGeneral ::
+  (FilePath -> Map FilePath (FileContent (ResourceT IO)) -> IO ()) ->
+  (forall t a b. Traversable t => t a -> (a -> IO b) -> IO (t b))  -> IO ()
+assertFileContenTheSameGeneral writeFun forFun = do
     withSystemTempDirectory "zip-conduit" $ \dir -> do
         let entriesInfo = entriesInfoFun dir
             entriesInfoMap = Map.fromList entriesInfo
@@ -219,7 +254,7 @@ assertFileContenTheSameGeneral forFun = do
         createFile (dir </> "bigly3.file") $ 1024 * 1024 * 2
         createFile (dir </> "bigly4.file") $ 1024 * 1024 * 1
         createFile (dir </> "bigly5.file") $ 1024 * 1024 * 3
-        _ <- writeZipFile archivePath $ Map.fromList entriesInfo
+        _ <- writeFun archivePath $ Map.fromList entriesInfo
         result' <- readZipFile @(ResourceT IO) archivePath
         case result' of
           Left errors ->
@@ -235,12 +270,9 @@ assertFileContenTheSameGeneral forFun = do
                 resulted <- runConduitRes $ fcFileContents fcontent .| C.fold
                 assertEqual ("same content" <> fileName) expected resulted
   where
-    archiveName = "test.zip"
     entriesInfoFun :: FilePath -> [(FilePath, FileContent (ResourceT IO))]
-    entriesInfoFun dir = [ ("test1.txt", appendBytestring "some test text" defOptions)
-                  , ("test2.txt", appendBytestring "some another test text" defOptions)
-                  , ("test3.txt", appendBytestring "one more" defOptions)
-                  , ("bigly", readFileContent (dir </> "bigly1.file" ))
+    entriesInfoFun dir = entriesInfo <>
+                  [ ("bigly", readFileContent (dir </> "bigly1.file" ))
                   , ("bigly2", readFileContent (dir </> "bigly2.file" ))
                   , ("bigly3", readFileContent (dir </> "bigly3.file" ))
                   , ("bigly4", readFileContent (dir </> "bigly4.file" ))
@@ -270,5 +302,15 @@ unZipArchive = do
           path = dir </> name
       createFile path 100
       writeZipFile (path <.> "zip") $ Map.singleton "somename" $ readFileContent path
+      bytes <- B.readFile (dir </> name <.> "zip")
+      A.extractFilesFromArchive [] $ A.toArchive bytes
+
+unZipArchiveAsync :: IO ()
+unZipArchiveAsync = do
+    withSystemTempDirectory ("archive-implementation") $ \dir -> do
+      let name = "xyz"
+          path = dir </> name
+      createFile path 100
+      writeZipFileAsync (path <.> "zip") $ Map.singleton "somename" $ readFileContent path
       bytes <- B.readFile (dir </> name <.> "zip")
       A.extractFilesFromArchive [] $ A.toArchive bytes

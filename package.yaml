@@ -92,6 +92,7 @@ tests:
     - lens
     - quickcheck-instances
     - zip-archive    
+    - random
 
 executables:
   bench:
